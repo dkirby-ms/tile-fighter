@@ -1,0 +1,25 @@
+{
+  "name": "tile-fighter",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "npm@10.9.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "tsc -b",
+    "lint": "npm run --workspaces lint",
+    "test": "npm run --workspaces test"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.0",
+    "@types/node": "^22.10.2",
+    "@typescript-eslint/eslint-plugin": "^8.62.0",
+    "@typescript-eslint/parser": "^8.62.0",
+    "eslint": "^9.39.0",
+    "globals": "^15.15.0",
+    "typescript": "^5.6.3",
+    "vitest": "^4.1.9"
+  }
+}
