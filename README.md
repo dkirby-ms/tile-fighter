@@ -57,8 +57,12 @@ npm run -w @game/server dev
 
 ```bash
 npm run -w @game/server migrate:up
-npm run -w @game/server migrate:generate
+npm run -w @game/server migrate:down
 ```
+
+## CI/CD Harness
+
+Deployment and release policy details are documented in [docs/cicd-harness.md](docs/cicd-harness.md).
 
 ## Tests
 

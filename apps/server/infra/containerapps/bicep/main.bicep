@@ -25,6 +25,14 @@ param containerPort int = 3000
 ])
 param revisionMode string = 'Multiple'
 
+@description('Tenant mode for runtime auth behavior.')
+@allowed([
+  'single'
+  'multi'
+  'both'
+])
+param tenantMode string = 'single'
+
 @description('Database URL secret value.')
 @secure()
 param databaseUrlSecret string
@@ -109,7 +117,7 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
             }
             {
               name: 'TENANT_MODE'
-              value: 'single'
+              value: tenantMode
             }
             {
               name: 'DATABASE_URL'

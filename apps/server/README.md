@@ -21,7 +21,7 @@ The `@game/server` package hosts the authoritative Colyseus backend and protecte
 * `npm run -w @game/server build`
 * `npm run -w @game/server test`
 * `npm run -w @game/server migrate:up`
-* `npm run -w @game/server migrate:generate`
+* `npm run -w @game/server migrate:down`
 
 ## Environment Variables
 
@@ -49,5 +49,7 @@ The `@game/server` package hosts the authoritative Colyseus backend and protecte
 
 ## Persistence
 
-Migration stack uses `drizzle-kit` and `drizzle-orm`.
-Initial migration creates `match_events` for authoritative event records.
+Migration stack uses `node-pg-migrate` via package scripts.
+
+* Apply migrations: `npm run -w @game/server migrate:up`
+* Roll back migrations: `npm run -w @game/server migrate:down`

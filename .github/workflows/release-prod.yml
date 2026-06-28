@@ -1,0 +1,112 @@
+name: Release Prod
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  release-prod:
+    name: Build and deploy prod
+    runs-on: ubuntu-latest
+    environment: prod
+
+    env:
+      IMAGE_REPOSITORY: tile-fighter-server
+      IMAGE_TAG: ${{ github.sha }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate required deployment inputs
+        env:
+          AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+          AZURE_RESOURCE_GROUP: ${{ secrets.AZURE_RESOURCE_GROUP }}
+          ACR_LOGIN_SERVER: ${{ secrets.ACR_LOGIN_SERVER }}
+          ACR_NAME: ${{ secrets.ACR_NAME }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          ENTRA_ISSUER: ${{ secrets.ENTRA_ISSUER }}
+          ENTRA_AUDIENCE: ${{ secrets.ENTRA_AUDIENCE }}
+          ENTRA_JWKS_URL: ${{ secrets.ENTRA_JWKS_URL }}
+          ENTRA_TENANT_ID: ${{ secrets.ENTRA_TENANT_ID }}
+        run: |
+          set -euo pipefail
+          required=(
+            AZURE_CREDENTIALS
+            AZURE_RESOURCE_GROUP
+            ACR_LOGIN_SERVER
+            ACR_NAME
+            DATABASE_URL
+            ENTRA_ISSUER
+            ENTRA_AUDIENCE
+            ENTRA_JWKS_URL
+            ENTRA_TENANT_ID
+          )
+          for key in "${required[@]}"; do
+            if [[ -z "${!key:-}" ]]; then
+              echo "Missing required secret: $key" >&2
+              exit 1
+            fi
+          done
+
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Build and push immutable image
+        env:
+          ACR_LOGIN_SERVER: ${{ secrets.ACR_LOGIN_SERVER }}
+          ACR_NAME: ${{ secrets.ACR_NAME }}
+        run: |
+          set -euo pipefail
+          IMAGE_NAME="${ACR_LOGIN_SERVER}/${IMAGE_REPOSITORY}:${IMAGE_TAG}"
+          az acr login --name "$ACR_NAME"
+          docker build -f apps/server/docker/Dockerfile -t "$IMAGE_NAME" .
+          docker push "$IMAGE_NAME"
+          echo "IMAGE_NAME=$IMAGE_NAME" >> "$GITHUB_ENV"
+
+      - name: Container vulnerability scan (fail on high/critical)
+        run: |
+          set -euo pipefail
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            aquasec/trivy:0.67.2 \
+            image --severity HIGH,CRITICAL --exit-code 1 "$IMAGE_NAME"
+
+      - name: Precheck managed environment
+        env:
+          AZURE_RESOURCE_GROUP: ${{ secrets.AZURE_RESOURCE_GROUP }}
+        run: |
+          set -euo pipefail
+          MANAGED_ENVIRONMENT_NAME="$(grep -E "^param managedEnvironmentName" apps/server/infra/containerapps/bicep/main.prod.bicepparam | cut -d "'" -f2)"
+          az containerapp env show \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
+            --name "$MANAGED_ENVIRONMENT_NAME" \
+            --only-show-errors > /dev/null
+
+      - name: Deploy to Azure Container Apps
+        env:
+          AZURE_RESOURCE_GROUP: ${{ secrets.AZURE_RESOURCE_GROUP }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          ENTRA_ISSUER: ${{ secrets.ENTRA_ISSUER }}
+          ENTRA_AUDIENCE: ${{ secrets.ENTRA_AUDIENCE }}
+          ENTRA_JWKS_URL: ${{ secrets.ENTRA_JWKS_URL }}
+          ENTRA_TENANT_ID: ${{ secrets.ENTRA_TENANT_ID }}
+        run: |
+          set -euo pipefail
+          TENANT_MODE="$(grep -E "^param tenantMode" apps/server/infra/containerapps/bicep/main.prod.bicepparam | cut -d "'" -f2)"
+          az deployment group create \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
+            --template-file apps/server/infra/containerapps/bicep/main.bicep \
+            --parameters @apps/server/infra/containerapps/bicep/main.prod.bicepparam \
+            --parameters imageName="$IMAGE_NAME" \
+            --parameters tenantMode="$TENANT_MODE" \
+            --parameters databaseUrlSecret="$DATABASE_URL" \
+            --parameters entraIssuerSecret="$ENTRA_ISSUER" \
+            --parameters entraAudienceSecret="$ENTRA_AUDIENCE" \
+            --parameters entraJwksUrlSecret="$ENTRA_JWKS_URL" \
+            --parameters entraTenantIdSecret="$ENTRA_TENANT_ID"

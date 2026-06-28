@@ -2,7 +2,7 @@ FROM node:22-alpine AS builder
 
 WORKDIR /workspace
 
-COPY package.json package-lock.json* tsconfig.base.json tsconfig.json .eslintrc.cjs ./
+COPY package.json package-lock.json* tsconfig.base.json tsconfig.json eslint.config.mjs ./
 COPY apps ./apps
 COPY packages ./packages
 
