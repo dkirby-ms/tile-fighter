@@ -21,8 +21,8 @@ First we will brainstorm and build our idea into a design document. We can works
 1. Use prompt built in previous step with GitHub Backlog Manager agent to create backlog as issues in GitHub. Be sure to enable tool execution for this agent, as it was not enabled for me.
     - Spend time grooming backlog using agents and your own judgement and experience.
     - Dont worry if you havent thought of everything. You can add more issues later.
-1. RPI your first epic
-    - Use your own judgement. Carefully review the planning artifact to be sure that it makes sense. For example, in my first epic, it wasnt aligned to Colyseus and would have built custom session connection management instead of using Colyseus. This was corrected after a second pass of the plan.
+1. RPI your first epic/issue
+    - Use your own judgement. Carefully review the planning artifact to be sure that it makes sense. For example, in my first epic, it wasnt aligned to Colyseus and would have built custom session connection management instead of using Colyseus. This was corrected after a second pass of the plan. It also didnt consider that we were planning to use Entra external identities for auth. I steered it to update the first task for both of these platform dependencies. Note that I had preselected this architecture based on other experience, but its perfectly valid to workshop both of these choices also and reach different conclusions.
 
 ### CI/CD Harness
 

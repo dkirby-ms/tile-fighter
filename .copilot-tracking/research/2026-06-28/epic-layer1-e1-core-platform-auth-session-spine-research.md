@@ -15,7 +15,8 @@ Research what is needed to deliver GitHub issue #1 for the tile-fighter reposito
 * Assumptions:
   * Issue #1 is the canonical epic record for E1 (Issue #41 is duplicate).
   * E1 stories map to E1-S1 through E1-S4 and should be delivered as one cohesive backbone.
-  * "Authenticated player reaches playable shell in <5s p50" is an acceptance target requiring measurable validation.
+  * Player authentication is backed by a dedicated Microsoft Entra External ID tenant using OAuth/OIDC, and the shell must acquire a game-API access token before bootstrap.
+  * "Authenticated player reaches playable shell in <5s p50" is an acceptance target requiring measurable validation from token-ready state for returning players, not from first interactive sign-in.
 * Success Criteria:
   * Epic scope is translated into concrete technical workstreams.
   * Gaps are evidenced with file-level references and/or issue content.
@@ -86,6 +87,14 @@ Research what is needed to deliver GitHub issue #1 for the tile-fighter reposito
 
 ## Key Discoveries
 
+### External ID Addendum
+
+* The current server-side auth layer already validates Entra-issued JWTs, but the plan must no longer assume E1 starts with a bearer token already on the client.
+* E1-S1 needs an explicit shell auth acquisition contract for OAuth 2.0 authorization code flow with PKCE against an Entra External ID tenant, with silent acquisition before bootstrap and interactive fallback when required.
+* The API access token issued by the External ID tenant should remain distinct from the short-lived room join token planned for E1-S2.
+* CI verification cannot rely only on an opaque static bearer token secret; it must document token provenance and, where feasible, validate the External ID token minting path or authority contract.
+* The existing `/v2.0` issuer and discovery endpoint shape in sample configuration is compatible with planning around a dedicated External ID tenant, but the plan must pin issuer, audience, and token-version expectations explicitly.
+
 ### Project Structure
 
 * The server already has a usable platform spine for startup, env parsing, DB readiness, auth middleware, protected route, room auth gating, and shutdown handling.
@@ -139,16 +148,18 @@ param tenantMode string = 'single'
 
 ### Epic Delivery Strategy for Layer1 Core Platform/Auth Spine
 
-Deliver E1 as an incremental hardening and capability-extension effort on top of the existing server/auth baseline, not as a platform rewrite.
+Deliver E1 as an incremental hardening and capability-extension effort on top of the existing server/auth baseline, not as a platform rewrite, while making the browser shell and server explicitly target OAuth-backed player sign-in through a Microsoft Entra External ID tenant.
 
 **Requirements:**
 
+* Define the shell-side OAuth/OIDC token acquisition contract for External ID-backed player auth, including silent acquisition, interactive fallback, and bounded retry behavior before bootstrap.
 * Implement authenticated session bootstrap contract (E1-S1).
 * Implement dedicated short-lived room join credential issuance and validation for Colyseus-compatible room admission (E1-S2).
 * Implement Colyseus lifecycle-driven presence hygiene with heartbeat as auxiliary metadata and stale-metadata cleanup semantics (E1-S3).
 * Maintain and expand protected-route plus health/readiness verification harness (E1-S4).
-* Validate acceptance target: authenticated playable shell <5s p50.
+* Validate acceptance target: authenticated playable shell <5s p50 from token-ready state for returning players, with first interactive sign-in measured separately if needed.
 * Preserve Colyseus room lifecycle and admission semantics as the only multiplayer room-membership authority.
+* Keep the External ID access token as the protected API credential only, and never reuse it as the room credential.
 
 **Preferred Approach:**
 
@@ -179,17 +190,22 @@ apps/server/tests/
     session-lifecycle.service.test.ts
 docs/
   layer1-backlog.md                 # optional: canonical story links cleanup
+apps/web/ or shell client
+  session store + OAuth state       # planned client-side token acquisition/retry state for External ID-backed bootstrap
 ```
 
 **Implementation Details:**
 
 1. Story E1-S1: Session bootstrap
+  * Define browser-shell OAuth assumptions for authorization code with PKCE against the External ID tenant.
+  * Attempt silent token acquisition before bootstrap and fall back to interactive sign-in only when required.
    * Add protected bootstrap endpoint returning normalized shell-init payload.
    * Include telemetry hooks for success/failure timing and cause class.
    * Add integration tests for unauthorized, authorized, and payload contract assertions.
 
 2. Story E1-S2: Join-token issuance
-   * Introduce server-issued short-lived join token signed with dedicated key/secret and claims bound to room + subject + expiry + nonce/jti.
+  * Introduce server-issued short-lived join token signed with dedicated key/secret and claims bound to room + subject + expiry + nonce/jti.
+  * Keep the upstream External ID access token scoped to protected HTTP APIs and separate from room admission.
   * Update room `onAuth` to validate join token rather than raw access token while preserving Colyseus lifecycle authority for room membership.
    * Add replay prevention strategy (nonce/jti cache window) and tests for expiry/replay/room mismatch.
 
@@ -199,15 +215,16 @@ docs/
   * Add integration tests for timeout and cleanup behaviors, including assertions that room membership remains Colyseus-managed.
 
 4. Story E1-S4: Verification gate
-   * Expand smoke harness to include protected bootstrap success and room join token path.
+  * Expand smoke harness to include protected bootstrap success and room join token path.
+  * Document verification-token provenance from the External ID tenant, including issuing authority, API audience, and test-player source.
    * Ensure CI gate covers readiness + protected route + room auth flow.
-   * Capture p50 startup metric evidence for epic closure.
+  * Capture p50 startup metric evidence for epic closure using token-ready start semantics for returning players.
 
 ```text
 Key dependencies and sequencing:
 S1 -> S2 -> S3 -> S4 gate tightening
 Auth middleware + shared JWT validation remain stable baseline
-Infra env additions needed for join-token signing secret and telemetry sink config
+Infra env additions needed for join-token signing secret, telemetry sink config, and External ID authority/audience/client-registration contract documentation
 Colyseus lifecycle hooks remain authoritative for multiplayer room-membership transitions
 ```
 
