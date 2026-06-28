@@ -15,6 +15,12 @@
     "declaration": true,
     "sourceMap": true,
     "experimentalDecorators": true,
-    "useDefineForClassFields": false
+    "useDefineForClassFields": false,
+    "baseUrl": ".",
+    "paths": {
+      "@game/shared-auth": ["packages/shared-auth/src"],
+      "@game/shared-types": ["packages/shared-types/src"],
+      "@game/shared-persistence": ["packages/shared-persistence/src"]
+    }
   }
 }
