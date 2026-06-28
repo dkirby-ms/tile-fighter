@@ -53,73 +53,73 @@ Implement E1 as sequential vertical slices on the existing server platform and C
 
 ## Implementation Checklist
 
-### [ ] Implementation Phase 1: External ID OAuth Bootstrap Vertical Slice (E1-S1)
+### [x] Implementation Phase 1: External ID OAuth Bootstrap Vertical Slice (E1-S1)
 
 <!-- parallelizable: false -->
 
-* [ ] Step 1.1: Define the External ID app-registration and authority contract for the shell client and game API.
+* [x] Step 1.1: Define the External ID app-registration and authority contract for the shell client and game API.
   * Details: .copilot-tracking/details/2026-06-28/epic-layer1-e1-core-platform-auth-session-spine-details.md (Lines 10-34)
-* [ ] Step 1.2: Define the shell-to-API OAuth contract for External ID-backed bootstrap, including token acquisition states, silent renewal, and bounded interactive fallback.
+* [x] Step 1.2: Define the shell-to-API OAuth contract for External ID-backed bootstrap, including token acquisition states, silent renewal, and bounded interactive fallback.
   * Details: .copilot-tracking/details/2026-06-28/epic-layer1-e1-core-platform-auth-session-spine-details.md (Lines 36-57)
-* [ ] Step 1.3: Create the shell auth implementation surface for External ID OAuth, including MSAL configuration, token-ready bootstrap gating, and bounded retry behavior.
+* [x] Step 1.3: Create the shell auth implementation surface for External ID OAuth, including MSAL configuration, token-ready bootstrap gating, and bounded retry behavior.
   * Details: .copilot-tracking/details/2026-06-28/epic-layer1-e1-core-platform-auth-session-spine-details.md (Lines 59-82)
-* [ ] Step 1.4: Harden External ID token validation in shared auth and server config before bootstrap depends on it.
+* [x] Step 1.4: Harden External ID token validation in shared auth and server config before bootstrap depends on it.
   * Details: .copilot-tracking/details/2026-06-28/epic-layer1-e1-core-platform-auth-session-spine-details.md (Lines 84-109)
-* [ ] Step 1.5: Add protected bootstrap endpoint and shell-init payload contract aligned to token-ready auth state.
+* [x] Step 1.5: Add protected bootstrap endpoint and shell-init payload contract aligned to token-ready auth state.
   * Details: .copilot-tracking/details/2026-06-28/epic-layer1-e1-core-platform-auth-session-spine-details.md (Lines 111-132)
-* [ ] Step 1.6: Add bootstrap integration tests, auth-retry expectations, and telemetry assertions.
+* [x] Step 1.6: Add bootstrap integration tests, auth-retry expectations, and telemetry assertions.
   * Details: .copilot-tracking/details/2026-06-28/epic-layer1-e1-core-platform-auth-session-spine-details.md (Lines 134-158)
-* [ ] Step 1.7: Add telemetry sink runtime and CI secret wiring for session telemetry and External ID verification provenance.
+* [x] Step 1.7: Add telemetry sink runtime and CI secret wiring for session telemetry and External ID verification provenance.
   * Details: .copilot-tracking/details/2026-06-28/epic-layer1-e1-core-platform-auth-session-spine-details.md (Lines 160-184)
-* [ ] Step 1.8: Validate phase changes.
+* [x] Step 1.8: Validate phase changes.
   * Run bootstrap-focused tests and server build checks.
 
-### [ ] Implementation Phase 2: Join Token Issuance and Room Admission (E1-S2)
+### [x] Implementation Phase 2: Join Token Issuance and Room Admission (E1-S2)
 
 <!-- parallelizable: false -->
 
-* [ ] Step 2.1: Implement short-lived room join token service and config contract for Colyseus-compatible room admission.
+* [x] Step 2.1: Implement short-lived room join token service and config contract for Colyseus-compatible room admission.
   * Details: .copilot-tracking/details/2026-06-28/epic-layer1-e1-core-platform-auth-session-spine-details.md (Lines 198-223)
-* [ ] Step 2.2: Add join-token issuance endpoint and switch room `onAuth` to join-token verification without adding parallel room-membership state or reusing the External ID access token as a room credential.
+* [x] Step 2.2: Add join-token issuance endpoint and switch room `onAuth` to join-token verification without adding parallel room-membership state or reusing the External ID access token as a room credential.
   * Details: .copilot-tracking/details/2026-06-28/epic-layer1-e1-core-platform-auth-session-spine-details.md (Lines 225-249)
-* [ ] Step 2.3: Add unit and integration coverage for join-token flow and replay/mismatch cases.
+* [x] Step 2.3: Add unit and integration coverage for join-token flow and replay/mismatch cases.
   * Details: .copilot-tracking/details/2026-06-28/epic-layer1-e1-core-platform-auth-session-spine-details.md (Lines 251-268)
-* [ ] Step 2.4: Validate phase changes.
+* [x] Step 2.4: Validate phase changes.
   * Run join-token tests and server build checks.
 
-### [ ] Implementation Phase 3: Colyseus Lifecycle and Presence Hygiene (E1-S3)
+### [x] Implementation Phase 3: Colyseus Lifecycle and Presence Hygiene (E1-S3)
 
 <!-- parallelizable: false -->
 
-* [ ] Step 3.1: Implement a non-authoritative lifecycle adapter that derives multiplayer liveness from Colyseus room lifecycle hooks.
+* [x] Step 3.1: Implement a non-authoritative lifecycle adapter that derives multiplayer liveness from Colyseus room lifecycle hooks.
   * Details: .copilot-tracking/details/2026-06-28/epic-layer1-e1-core-platform-auth-session-spine-details.md (Lines 281-305)
-* [ ] Step 3.2: Integrate heartbeat endpoint/channel updates as auxiliary presence metadata and stale-metadata cleanup behavior, with telemetry that distinguishes auth churn from transport churn.
+* [x] Step 3.2: Integrate heartbeat endpoint/channel updates as auxiliary presence metadata and stale-metadata cleanup behavior, with telemetry that distinguishes auth churn from transport churn.
   * Details: .copilot-tracking/details/2026-06-28/epic-layer1-e1-core-platform-auth-session-spine-details.md (Lines 307-328)
-* [ ] Step 3.3: Add lifecycle unit/integration suites that verify Colyseus remains the only room-membership authority.
+* [x] Step 3.3: Add lifecycle unit/integration suites that verify Colyseus remains the only room-membership authority.
   * Details: .copilot-tracking/details/2026-06-28/epic-layer1-e1-core-platform-auth-session-spine-details.md (Lines 330-347)
-* [ ] Step 3.4: Validate phase changes.
+* [x] Step 3.4: Validate phase changes.
   * Run lifecycle tests and server build checks.
 
-### [ ] Implementation Phase 4: Verification Gate and p50 Evidence (E1-S4)
+### [x] Implementation Phase 4: Verification Gate and p50 Evidence (E1-S4)
 
 <!-- parallelizable: false -->
 
-* [ ] Step 4.1: Expand verification harness to include health/readiness, protected-profile smoke, authenticated bootstrap, and room-join token flow with documented External ID token provenance and expected-claim validation.
+* [x] Step 4.1: Expand verification harness to include health/readiness, protected-profile smoke, authenticated bootstrap, and room-join token flow with documented External ID token provenance and expected-claim validation.
   * Details: .copilot-tracking/details/2026-06-28/epic-layer1-e1-core-platform-auth-session-spine-details.md (Lines 360-386)
-* [ ] Step 4.2: Define playable-shell p50 metric contract from token-ready state and capture CI evidence artifacts.
+* [x] Step 4.2: Define playable-shell p50 metric contract from token-ready state and capture CI evidence artifacts.
   * Details: .copilot-tracking/details/2026-06-28/epic-layer1-e1-core-platform-auth-session-spine-details.md (Lines 388-409)
-* [ ] Step 4.3: Validate phase changes.
+* [x] Step 4.3: Validate phase changes.
   * Run workflow/docs formatting checks and non-prod load validation.
 
 ### [ ] Implementation Phase 5: Full Validation
 
 <!-- parallelizable: false -->
 
-* [ ] Step 5.1: Run full project validation.
+* [x] Step 5.1: Run full project validation.
   * Execute lint, test, build, and load validation commands for modified components.
-* [ ] Step 5.2: Fix minor validation issues.
+* [x] Step 5.2: Fix minor validation issues.
   * Iterate on straightforward lint/build/test findings.
-* [ ] Step 5.3: Report blocking issues.
+* [x] Step 5.3: Report blocking issues.
   * Document blockers and closure-evidence gaps requiring follow-on planning.
 
 ## Planning Log

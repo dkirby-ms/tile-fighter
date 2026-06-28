@@ -7,8 +7,10 @@ export function createProtectedRoutes(): Router {
     const principal = res.locals.principal;
     res.status(200).json({
       subject: principal.subject,
+      tenantScopedSubject: principal.tenantScopedSubject,
       issuer: principal.issuer,
-      tenantId: principal.tenantId
+      tenantId: principal.tenantId,
+      tokenVersion: principal.tokenVersion
     });
   });
 

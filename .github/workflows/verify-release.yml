@@ -49,6 +49,14 @@ jobs:
           APP_URL_INPUT: ${{ inputs.app_url }}
           APP_BASE_URL: ${{ secrets.APP_BASE_URL }}
           VERIFY_BEARER_TOKEN: ${{ secrets.VERIFY_BEARER_TOKEN }}
+          VERIFY_TOKEN_EXPECTED_ISSUER: ${{ secrets.VERIFY_TOKEN_EXPECTED_ISSUER }}
+          VERIFY_TOKEN_EXPECTED_AUDIENCE: ${{ secrets.VERIFY_TOKEN_EXPECTED_AUDIENCE }}
+          VERIFY_TOKEN_EXPECTED_VERSION: ${{ secrets.VERIFY_TOKEN_EXPECTED_VERSION }}
+          VERIFY_TOKEN_EXPECTED_TENANT_ID: ${{ secrets.VERIFY_TOKEN_EXPECTED_TENANT_ID }}
+          VERIFY_TOKEN_PROVENANCE: ${{ secrets.VERIFY_TOKEN_PROVENANCE }}
+          TELEMETRY_SINK_MODE: ${{ secrets.TELEMETRY_SINK_MODE }}
+          TELEMETRY_SINK_URL: ${{ secrets.TELEMETRY_SINK_URL }}
+          TELEMETRY_SINK_NAME: ${{ secrets.TELEMETRY_SINK_NAME }}
         run: |
           set -euo pipefail
 
@@ -67,12 +75,81 @@ jobs:
             exit 1
           fi
 
+          if [[ -z "${VERIFY_TOKEN_EXPECTED_ISSUER:-}" || -z "${VERIFY_TOKEN_EXPECTED_AUDIENCE:-}" || -z "${VERIFY_TOKEN_EXPECTED_VERSION:-}" || -z "${VERIFY_TOKEN_EXPECTED_TENANT_ID:-}" ]]; then
+            echo "Missing required expected-claim secret(s) for verification token validation." >&2
+            exit 1
+          fi
+
+          if [[ -z "${VERIFY_TOKEN_PROVENANCE:-}" ]]; then
+            echo "Missing required secret: VERIFY_TOKEN_PROVENANCE" >&2
+            exit 1
+          fi
+
+          TELEMETRY_MODE="${TELEMETRY_SINK_MODE:-optional}"
+          if [[ "$TELEMETRY_MODE" == "required" && -z "${TELEMETRY_SINK_URL:-}" ]]; then
+            echo "TELEMETRY_SINK_URL is required when TELEMETRY_SINK_MODE=required" >&2
+            exit 1
+          fi
+
           APP_URL="${APP_URL%/}"
           WS_URL="${APP_URL/https:\/\//wss://}"
           WS_URL="${WS_URL/http:\/\//ws://}"
 
           echo "APP_URL=$APP_URL" >> "$GITHUB_ENV"
           echo "WS_URL=$WS_URL" >> "$GITHUB_ENV"
+          echo "TELEMETRY_SINK_MODE=$TELEMETRY_MODE" >> "$GITHUB_ENV"
+          echo "TELEMETRY_SINK_URL=${TELEMETRY_SINK_URL:-}" >> "$GITHUB_ENV"
+          echo "TELEMETRY_SINK_NAME=${TELEMETRY_SINK_NAME:-verify-release}" >> "$GITHUB_ENV"
+
+      - name: Validate verification token provenance and expected claims
+        env:
+          VERIFY_BEARER_TOKEN: ${{ secrets.VERIFY_BEARER_TOKEN }}
+          VERIFY_TOKEN_EXPECTED_ISSUER: ${{ secrets.VERIFY_TOKEN_EXPECTED_ISSUER }}
+          VERIFY_TOKEN_EXPECTED_AUDIENCE: ${{ secrets.VERIFY_TOKEN_EXPECTED_AUDIENCE }}
+          VERIFY_TOKEN_EXPECTED_VERSION: ${{ secrets.VERIFY_TOKEN_EXPECTED_VERSION }}
+          VERIFY_TOKEN_EXPECTED_TENANT_ID: ${{ secrets.VERIFY_TOKEN_EXPECTED_TENANT_ID }}
+          VERIFY_TOKEN_PROVENANCE: ${{ secrets.VERIFY_TOKEN_PROVENANCE }}
+        run: |
+          set -euo pipefail
+
+          node - <<'NODE'
+          const token = process.env.VERIFY_BEARER_TOKEN;
+          const expectedIssuer = process.env.VERIFY_TOKEN_EXPECTED_ISSUER;
+          const expectedAudience = process.env.VERIFY_TOKEN_EXPECTED_AUDIENCE;
+          const expectedVersion = process.env.VERIFY_TOKEN_EXPECTED_VERSION;
+          const expectedTenantId = process.env.VERIFY_TOKEN_EXPECTED_TENANT_ID;
+          const provenance = process.env.VERIFY_TOKEN_PROVENANCE;
+
+          if (!token || !expectedIssuer || !expectedAudience || !expectedVersion || !expectedTenantId || !provenance) {
+            throw new Error("Missing verification token validation inputs");
+          }
+
+          const parts = token.split(".");
+          if (parts.length < 2) {
+            throw new Error("Verification token is malformed");
+          }
+
+          const payload = JSON.parse(Buffer.from(parts[1], "base64url").toString("utf8"));
+          const audience = Array.isArray(payload.aud) ? payload.aud : [payload.aud];
+
+          if (payload.iss !== expectedIssuer) {
+            throw new Error(`Verification token issuer mismatch: expected ${expectedIssuer}, got ${payload.iss}`);
+          }
+
+          if (!audience.includes(expectedAudience)) {
+            throw new Error(`Verification token audience mismatch: expected ${expectedAudience}, got ${audience.join(",")}`);
+          }
+
+          if (payload.ver !== expectedVersion) {
+            throw new Error(`Verification token version mismatch: expected ${expectedVersion}, got ${payload.ver}`);
+          }
+
+          if (payload.tid !== expectedTenantId) {
+            throw new Error(`Verification token tenant mismatch: expected ${expectedTenantId}, got ${payload.tid}`);
+          }
+
+          process.stdout.write(`Verification token provenance: ${provenance}\n`);
+          NODE
 
       - name: Verify liveness probe
         run: |
@@ -97,9 +174,70 @@ jobs:
             exit 1
           fi
 
+      - name: Verify authenticated bootstrap route
+        env:
+          VERIFY_BEARER_TOKEN: ${{ secrets.VERIFY_BEARER_TOKEN }}
+        run: |
+          set -euo pipefail
+          RESPONSE="$(curl --fail --silent --show-error \
+            -H "Authorization: Bearer ${VERIFY_BEARER_TOKEN}" \
+            "$APP_URL/api/session/bootstrap")"
+          if [[ "$RESPONSE" != *'"bootstrapState":"token-ready"'* ]]; then
+            echo "Bootstrap route returned unexpected bootstrap state." >&2
+            exit 1
+          fi
+
       - name: Verify authenticated room join smoke
         env:
           LOAD_ENDPOINT: ${{ env.WS_URL }}
           LOAD_BEARER_TOKEN: ${{ secrets.VERIFY_BEARER_TOKEN }}
           LOAD_JOIN_COUNT: 5
+          LOAD_ROOM_KEY: arena
+          LOAD_EVIDENCE_PATH: artifacts/verify-room-join-metrics.json
         run: npm run -w @game/server test:load
+
+      - name: Verify room join metrics and playable-shell p50 budget
+        run: |
+          set -euo pipefail
+
+          node - <<'NODE'
+          const fs = require("node:fs");
+
+          const evidencePath = "artifacts/verify-room-join-metrics.json";
+          if (!fs.existsSync(evidencePath)) {
+            throw new Error(`Missing expected evidence artifact: ${evidencePath}`);
+          }
+
+          const evidence = JSON.parse(fs.readFileSync(evidencePath, "utf8"));
+          if (typeof evidence.p50Ms !== "number") {
+            throw new Error("Evidence artifact missing numeric p50Ms");
+          }
+          if (evidence.p50Ms > 5000) {
+            throw new Error(`Playable-shell p50 regression: expected <= 5000ms, got ${evidence.p50Ms}ms`);
+          }
+
+          process.stdout.write(`Verified playable-shell p50 budget: ${evidence.p50Ms}ms\n`);
+          NODE
+
+      - name: Assert Colyseus remains room-membership authority
+        run: |
+          set -euo pipefail
+
+          ROOM_HOOK_COUNT="$(grep -E "onJoin|onLeave" -c apps/server/src/rooms/arena.room.ts || true)"
+          LIFECYCLE_JOIN_COUNT="$(grep -E "noteRoomJoin|noteRoomLeave" -c apps/server/src/session/session-lifecycle.service.ts || true)"
+
+          if [[ "$ROOM_HOOK_COUNT" -lt 2 ]]; then
+            echo "Expected Colyseus room lifecycle hooks in arena room implementation." >&2
+            exit 1
+          fi
+
+          if [[ "$LIFECYCLE_JOIN_COUNT" -gt 0 ]]; then
+            echo "Lifecycle service should not own room membership transitions directly." >&2
+            exit 1
+          fi
+
+      - name: Upload verification evidence artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: verify-release-evidence-${{ github.run_id }}
+          path: artifacts/

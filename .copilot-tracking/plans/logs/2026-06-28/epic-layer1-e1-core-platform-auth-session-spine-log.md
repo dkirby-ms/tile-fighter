@@ -13,6 +13,29 @@ Gaps and differences identified between research findings and the implementation
 
 * None currently. The selected E1 verification strategy keeps pre-minted External ID tokens for smoke checks and adds explicit provenance plus expected-claim validation in the verification workflow.
 
+### Implementation Deviations
+
+* DD-01: Created `apps/client` workspace during E1-S1 implementation.
+  * Plan specifies: Planned shell auth implementation surface under `apps/client/`.
+  * Implementation differs: The workspace did not previously exist and was created as a minimal additive package to host MSAL/token-ready bootstrap logic.
+  * Rationale: Required to satisfy Step 1.3 with concrete in-repo implementation files.
+* DD-02: Join-token replay tracking explicitly bounded to token expiry.
+  * Plan specifies: Replay protection primitives for room admission without introducing a second room-membership state machine.
+  * Implementation differs: Added an expiring in-memory consumed-token cache keyed by `jti` and pruned by token `exp`.
+  * Rationale: Keep replay defense admission-scoped and time-bounded, preventing drift into long-lived session state management.
+* DD-03: Lifecycle adapter implemented as metadata-only service with explicit room-hook integration.
+  * Plan specifies: Non-authoritative lifecycle adapter derived from Colyseus lifecycle hooks.
+  * Implementation differs: Added heartbeat endpoint and metadata cleanup service, with room join/leave signals emitted from `ArenaRoom` hooks.
+  * Rationale: Preserve Colyseus as room-membership authority while enabling stale metadata hygiene and telemetry.
+* DD-04: Verification/load harness aligned to stable room key and p50 evidence artifact output.
+  * Plan specifies: Verification gate checks bootstrap + room-join flow and captures p50 evidence.
+  * Implementation differs: Load harness now executes token-ready bootstrap + join-token mint + authenticated room join and writes `artifacts/verify-room-join-metrics.json`.
+  * Rationale: Make p50 metric reproducible and enforceable in verify workflow.
+* DD-05: Full validation load check blocked in local environment.
+  * Plan specifies: Run full lint/test/build/load validation commands.
+  * Implementation differs: Load command fails locally without required runtime env (`DATABASE_URL`, `ENTRA_ISSUER`, `ENTRA_AUDIENCE`, `ENTRA_JWKS_URL`, `TENANT_MODE`).
+  * Rationale: Treat as environment blocker; verification workflow remains capable when secrets are provisioned.
+
 ## Implementation Paths Considered
 
 ### Selected: Incremental Vertical Slices on Existing Spine
@@ -59,3 +82,6 @@ Gaps and differences identified between research findings and the implementation
 * WI-04: Verification artifact retention policy — Standardize storage duration and naming for p50 evidence and smoke logs in CI artifacts. (low)
   * Source: E1 exit criteria requires measurable proof for closure.
   * Dependency: E1-S4 verification workflow updates complete.
+* WI-05: Local load harness env bootstrap profile — Provide developer-safe `.env.load.local` profile and documentation for running `test:load` outside CI. (medium)
+  * Source: Phase 5 full validation blocker (local env lacks required runtime auth/DB vars).
+  * Dependency: Decide local strategy for External ID token source and database endpoint.

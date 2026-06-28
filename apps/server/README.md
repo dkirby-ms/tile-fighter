@@ -30,11 +30,15 @@ The `@game/server` package hosts the authoritative Colyseus backend and protecte
 * `ENTRA_ISSUER`
 * `ENTRA_AUDIENCE`
 * `ENTRA_JWKS_URL`
+* `ENTRA_TOKEN_VERSION`
 * `TENANT_MODE`
 * `ENTRA_TENANT_ID` (required for `TENANT_MODE=single`)
 * `ALLOWED_TENANT_IDS`
 * `DENIED_TENANT_IDS`
 * `ALLOWED_ISSUERS`
+* `TELEMETRY_SINK_MODE`
+* `TELEMETRY_SINK_URL`
+* `TELEMETRY_SINK_NAME`
 
 ## Health Endpoints
 

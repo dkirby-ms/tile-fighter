@@ -1,5 +1,6 @@
 import { Client } from "@colyseus/sdk";
 import { spawn } from "node:child_process";
+import { mkdir, writeFile } from "node:fs/promises";
 
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
 const REQUIRED_SERVER_ENV = [
@@ -134,6 +135,10 @@ async function runLoadScenario(): Promise<void> {
   const endpoint = process.env.LOAD_ENDPOINT ?? "ws://localhost:3000";
   const joinCount = Number.parseInt(process.env.LOAD_JOIN_COUNT ?? "25", 10);
   const token = process.env.LOAD_BEARER_TOKEN ?? "replace-me";
+  const joinTokenPath = process.env.LOAD_JOIN_TOKEN_PATH ?? "/api/session/join-token";
+  const bootstrapPath = process.env.LOAD_BOOTSTRAP_PATH ?? "/api/session/bootstrap";
+  const roomKey = process.env.LOAD_ROOM_KEY ?? "arena";
+  const evidencePath = process.env.LOAD_EVIDENCE_PATH;
   let localServer: LocalServerHandle | undefined;
 
   if (shouldAutoStartServer(endpoint)) {
@@ -141,27 +146,78 @@ async function runLoadScenario(): Promise<void> {
     localServer = await startLocalServer(endpoint);
   }
 
-  const clients: Client[] = [];
-  const rooms = [];
-  const start = Date.now();
+  const httpUrl = toHttpUrl(endpoint);
+  const joinDurationsMs: number[] = [];
+  const joinedRooms = [];
 
   try {
     for (let i = 0; i < joinCount; i += 1) {
-      const client = new Client(endpoint);
-      clients.push(client);
-      rooms.push(client.joinOrCreate("arena", { token }));
-    }
+      const bootstrapStartedAt = Date.now();
+      const bootstrapResponse = await fetch(`${httpUrl.origin}${bootstrapPath}`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      if (!bootstrapResponse.ok) {
+        throw new Error(`Bootstrap request failed with status ${bootstrapResponse.status}`);
+      }
 
-    const joinedRooms = await Promise.all(rooms);
+      const joinTokenResponse = await fetch(`${httpUrl.origin}${joinTokenPath}`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ roomId: roomKey })
+      });
+      if (!joinTokenResponse.ok) {
+        throw new Error(`Join-token request failed with status ${joinTokenResponse.status}`);
+      }
+      const joinTokenPayload = (await joinTokenResponse.json()) as {
+        joinToken?: string;
+      };
+      if (!joinTokenPayload.joinToken) {
+        throw new Error("Join-token response missing joinToken");
+      }
+
+      const client = new Client(endpoint);
+      const room = await client.joinOrCreate(roomKey, { joinToken: joinTokenPayload.joinToken });
+      joinedRooms.push(room);
+      joinDurationsMs.push(Date.now() - bootstrapStartedAt);
+    }
 
     for (const room of joinedRooms) {
       room.send("ping", { at: Date.now() });
     }
 
-    const elapsedMs = Date.now() - start;
+    const sortedDurations = [...joinDurationsMs].sort((a, b) => a - b);
+    const p50Index = Math.max(0, Math.floor((sortedDurations.length - 1) * 0.5));
+    const p50Ms = sortedDurations[p50Index] ?? 0;
+    const elapsedMs = sortedDurations.reduce((acc, value) => acc + value, 0);
+
+    const evidence = {
+      endpoint,
+      roomKey,
+      samples: joinDurationsMs.length,
+      startBoundary: "token-ready",
+      endBoundary: "bootstrap-success-plus-room-join",
+      p50Ms,
+      averageMs: joinDurationsMs.length > 0 ? Math.round(elapsedMs / joinDurationsMs.length) : 0,
+      durationsMs: joinDurationsMs
+    };
+
     process.stdout.write(
-      `Load scenario finished: joined ${joinedRooms.length} rooms in ${elapsedMs}ms at ${endpoint}\n`
+      `Load scenario finished: joined ${joinedRooms.length} rooms at ${endpoint}; p50=${p50Ms}ms from token-ready to playable shell\n`
     );
+
+    if (evidencePath) {
+      const slashIndex = evidencePath.lastIndexOf("/");
+      if (slashIndex > 0) {
+        await mkdir(evidencePath.slice(0, slashIndex), { recursive: true });
+      }
+      await writeFile(evidencePath, `${JSON.stringify(evidence, null, 2)}\n`, "utf8");
+      process.stdout.write(`Wrote load evidence artifact to ${evidencePath}\n`);
+    }
 
     await Promise.all(
       joinedRooms.map(async (room) => {

@@ -7,6 +7,7 @@ export interface JwtValidationConfig {
   issuer: string;
   audience: string;
   algorithms: readonly jwt.Algorithm[];
+  acceptedTokenVersion: "1.0" | "2.0";
   tenantMode: TenantMode;
   singleTenantId?: string;
   allowedTenantIds: readonly string[];
@@ -20,6 +21,7 @@ export interface JwtValidatorDeps {
 
 interface EntraJwtPayload extends JwtPayload {
   tid?: string;
+  ver?: string;
 }
 
 export class JwtValidator {
@@ -56,13 +58,33 @@ export class JwtValidator {
     const payload = await this.verifyToken(token);
     this.enforceTenantMode(payload);
 
+    if (!payload.sub) {
+      throw new Error("Token subject is required");
+    }
+
+    if (!payload.ver || payload.ver !== this.config.acceptedTokenVersion) {
+      throw new Error("Token version is not accepted");
+    }
+
+    const tenantScopedSubject = this.buildTenantScopedSubject(payload);
+
     return {
-      subject: payload.sub ?? "",
+      subject: payload.sub,
+      tenantScopedSubject,
       issuer: payload.iss ?? "",
       audience: payload.aud ?? "",
       ...(payload.tid ? { tenantId: payload.tid } : {}),
+      tokenVersion: payload.ver,
       expiresAt: payload.exp ?? 0
     };
+  }
+
+  private buildTenantScopedSubject(payload: EntraJwtPayload): string {
+    if (payload.tid) {
+      return `${payload.tid}|${payload.sub}`;
+    }
+
+    return payload.sub ?? "";
   }
 
   private async verifyToken(token: string): Promise<EntraJwtPayload> {

@@ -43,6 +43,10 @@ Dev and prod release workflows both require this exact naming contract in GitHub
 - `ENTRA_AUDIENCE`
 - `ENTRA_JWKS_URL`
 - `ENTRA_TENANT_ID`
+- `ENTRA_TOKEN_VERSION`
+- `TELEMETRY_SINK_MODE`
+- `TELEMETRY_SINK_URL`
+- `TELEMETRY_SINK_NAME`
 
 Secrets are injected only at deploy time through `az deployment group create --parameters ...` overrides.
 
@@ -84,12 +88,28 @@ Verification checks:
 - `GET /healthz` returns a successful response.
 - `GET /readyz` returns a successful response.
 - `GET /api/protected/profile` succeeds with a valid bearer token.
+- `GET /api/session/bootstrap` succeeds from a token-ready caller state and returns shell-init retry policy.
 - Authenticated room-join smoke succeeds through the existing `npm run -w @game/server test:load` harness.
+- Verification run asserts room-membership authority remains in Colyseus room lifecycle hooks.
 
 Required environment secrets for verification:
 
 - `APP_BASE_URL`
 - `VERIFY_BEARER_TOKEN`
+- `VERIFY_TOKEN_EXPECTED_ISSUER`
+- `VERIFY_TOKEN_EXPECTED_AUDIENCE`
+- `VERIFY_TOKEN_EXPECTED_VERSION`
+- `VERIFY_TOKEN_EXPECTED_TENANT_ID`
+- `VERIFY_TOKEN_PROVENANCE`
+- `TELEMETRY_SINK_MODE`
+- `TELEMETRY_SINK_URL`
+- `TELEMETRY_SINK_NAME`
+
+Verification token provenance requirements:
+
+- The verification token must be minted by the dedicated External ID tenant used for player auth.
+- The verification token must target the game API audience (`api://tile-fighter-server`).
+- The provenance record must include issuing tenant, token minting path, and test-player source.
 
 ## Rollback Procedure
 
@@ -127,6 +147,27 @@ Use this checklist when verification or load checks fail:
 1. Confirm release job status and capture the deployment logs.
 2. Check `/healthz` and `/readyz` directly from the deployed ingress URL.
 3. Confirm protected route auth by validating the verification token source and claims.
+4. Confirm bootstrap route auth and shell-init payload contract from token-ready state.
+5. Confirm telemetry sink configuration for required environments.
+6. Run the room-join smoke test with reduced `LOAD_JOIN_COUNT` to isolate auth or transport failures.
+7. Decide rollback based on readiness and authenticated smoke outcome, not only liveness.
+8. Open an incident issue with timeline, affected revision, and mitigation status.
+
+## Metric Contract for E1 Bootstrap
+
+The E1 playable-shell p50 metric uses this start boundary and end boundary:
+
+- Start: shell enters token-ready state with valid External ID API access token.
+- End: authenticated room join completes after bootstrap and join-token issuance.
+
+This excludes first interactive sign-in time. If needed, measure first interactive sign-in as a separate metric.
+
+Verification evidence artifact:
+
+- Workflow writes `artifacts/verify-room-join-metrics.json` containing sample count, durations, and `p50Ms`.
+- Promotion is blocked when `p50Ms` exceeds `5000`.
+- Verification evidence is uploaded via workflow artifact retention for release review.
+
 4. Run the room-join smoke test with reduced `LOAD_JOIN_COUNT` to isolate auth or transport failures.
 5. Decide rollback based on readiness and authenticated smoke outcome, not only liveness.
 6. Open an incident issue with timeline, affected revision, and mitigation status.
