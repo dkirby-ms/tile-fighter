@@ -13,11 +13,13 @@ import {
 } from "./persistence/db.js";
 import { createTileRepository } from "./persistence/tile.repository.js";
 import { createRegionSnapshotRepository } from "./persistence/region-snapshot.repository.js";
+import { createRegionDiffRepository } from "./persistence/region-diff.repository.js";
 import { ArenaRoom } from "./rooms/arena.room.js";
 import { registerGracefulShutdown } from "./shutdown/graceful-shutdown.js";
 import { TelemetrySink } from "./telemetry/telemetry-sink.js";
 import { SessionLifecycleService } from "./session/session-lifecycle.service.js";
 import { createRegionSnapshotService } from "./domain/region-snapshot.service.js";
+import { createRegionDiffService } from "./domain/region-diff.service.js";
 
 async function bootstrap(): Promise<void> {
   const runtimeConfig = readRuntimeConfig();
@@ -28,9 +30,15 @@ async function bootstrap(): Promise<void> {
   const telemetrySink = new TelemetrySink(runtimeConfig);
   const tileRepository = createTileRepository();
   const regionSnapshotRepository = createRegionSnapshotRepository();
+  const regionDiffRepository = createRegionDiffRepository();
   const regionSnapshotService = createRegionSnapshotService({
     db: dbRuntime.db,
     repository: regionSnapshotRepository,
+    telemetrySink
+  });
+  const regionDiffService = createRegionDiffService({
+    db: dbRuntime.db,
+    repository: regionDiffRepository,
     telemetrySink
   });
   const lifecycleService = new SessionLifecycleService({
@@ -69,7 +77,8 @@ async function bootstrap(): Promise<void> {
     lifecycleService,
     db: dbRuntime.db,
     tileRepository,
-    regionSnapshotService
+    regionSnapshotService,
+    regionDiffService
   });
 
   const nodeServer = http.createServer(app);

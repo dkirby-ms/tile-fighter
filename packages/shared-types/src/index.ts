@@ -74,3 +74,48 @@ export type TileEditResult =
       ok: false;
       reason: "forbidden_owner_mismatch" | "edit_window_expired";
     };
+
+export interface RegionDiffViewport {
+  minCellX: number;
+  maxCellX: number;
+  minCellY: number;
+  maxCellY: number;
+}
+
+export interface RegionDiffRequest {
+  regionId: string;
+  sinceVersion: number;
+  viewport: RegionDiffViewport;
+  maxTiles?: number;
+}
+
+export type RegionDiffOperation = "upsert" | "delete";
+
+export interface RegionDiffTileDelta {
+  cellX: number;
+  cellY: number;
+  version: number;
+  operation: RegionDiffOperation;
+  offsetX: number | null;
+  offsetY: number | null;
+  shape: string | null;
+  color: string | null;
+  stylePayload: unknown | null;
+  ownerId: string | null;
+}
+
+export interface RegionDiffResponse {
+  ok: true;
+  regionId: string;
+  sinceVersion: number;
+  currentVersion: number;
+  nextSinceVersion: number;
+  isEmpty: boolean;
+  truncated: boolean;
+  tiles: RegionDiffTileDelta[];
+  metadata: {
+    viewport: RegionDiffViewport;
+    maxTiles: number;
+    returnedTileCount: number;
+  };
+}

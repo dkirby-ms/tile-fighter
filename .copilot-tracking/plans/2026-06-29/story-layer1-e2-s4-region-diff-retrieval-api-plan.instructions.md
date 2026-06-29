@@ -52,64 +52,64 @@ Implement an authenticated viewport-scoped region diff retrieval API that return
 
 ## Implementation Checklist
 
-### [ ] Implementation Phase 1: Data Model and Persistence Foundation
+### [x] Implementation Phase 1: Data Model and Persistence Foundation
 
 <!-- parallelizable: false -->
 
-* [ ] Step 1.1: Add migration for region version and tile delta tables
+* [x] Step 1.1: Add migration for region version and tile delta tables
   * Details: .copilot-tracking/details/2026-06-29/story-layer1-e2-s4-region-diff-retrieval-api-details.md (Lines 12-32)
-* [ ] Step 1.2: Implement diff repository and transactional write-path versioning hooks
+* [x] Step 1.2: Implement diff repository and transactional write-path versioning hooks
   * Details: .copilot-tracking/details/2026-06-29/story-layer1-e2-s4-region-diff-retrieval-api-details.md (Lines 34-56)
-* [ ] Step 1.3: Validate persistence changes
+* [x] Step 1.3: Validate persistence changes
   * Details: .copilot-tracking/details/2026-06-29/story-layer1-e2-s4-region-diff-retrieval-api-details.md (Lines 58-63)
 
-### [ ] Implementation Phase 2: Diff Service and Telemetry
+### [x] Implementation Phase 2: Diff Service and Telemetry
 
 <!-- parallelizable: true -->
 
 Conditional note: Step 2.1 and Step 2.2 depend on Phase 1, but this phase can proceed in parallel with Phase 3 Step 3.1 because files do not overlap.
 
-* [ ] Step 2.1: Implement region diff service orchestration and response assembly
+* [x] Step 2.1: Implement region diff service orchestration and response assembly
   * Details: .copilot-tracking/details/2026-06-29/story-layer1-e2-s4-region-diff-retrieval-api-details.md (Lines 70-90)
-* [ ] Step 2.2: Add diff telemetry helper methods and instrumentation
+* [x] Step 2.2: Add diff telemetry helper methods and instrumentation
   * Details: .copilot-tracking/details/2026-06-29/story-layer1-e2-s4-region-diff-retrieval-api-details.md (Lines 91-112)
-* [ ] Step 2.3: Validate service and telemetry behavior
+* [x] Step 2.3: Validate service and telemetry behavior
   * Details: .copilot-tracking/details/2026-06-29/story-layer1-e2-s4-region-diff-retrieval-api-details.md (Lines 113-119)
 
-### [ ] Implementation Phase 3: HTTP Contract and Route Wiring
+### [x] Implementation Phase 3: HTTP Contract and Route Wiring
 
 <!-- parallelizable: true -->
 
 Conditional note: Step 3.1 can execute in parallel with Phase 2. Steps 3.2 and 3.3 must run after Phase 2 completion.
 
-* [ ] Step 3.1: Add shared request/response contract types
+* [x] Step 3.1: Add shared request/response contract types
   * Details: .copilot-tracking/details/2026-06-29/story-layer1-e2-s4-region-diff-retrieval-api-details.md (Lines 125-145)
-* [ ] Step 3.2: Add region diff route and app wiring
+* [x] Step 3.2: Add region diff route and app wiring
   * Details: .copilot-tracking/details/2026-06-29/story-layer1-e2-s4-region-diff-retrieval-api-details.md (Lines 146-171)
-* [ ] Step 3.3: Validate route and contract behavior
+* [x] Step 3.3: Validate route and contract behavior
   * Details: .copilot-tracking/details/2026-06-29/story-layer1-e2-s4-region-diff-retrieval-api-details.md (Lines 172-178)
 
-### [ ] Implementation Phase 4: Test Matrix and Load Harness
+### [x] Implementation Phase 4: Test Matrix and Load Harness
 
 <!-- parallelizable: false -->
 
-* [ ] Step 4.1: Add unit and integration diff behavior tests
+* [x] Step 4.1: Add unit and integration diff behavior tests
   * Details: .copilot-tracking/details/2026-06-29/story-layer1-e2-s4-region-diff-retrieval-api-details.md (Lines 184-206)
-* [ ] Step 4.2: Add load scenario for stale and unchanged diff requests
+* [x] Step 4.2: Add load scenario for stale and unchanged diff requests
   * Details: .copilot-tracking/details/2026-06-29/story-layer1-e2-s4-region-diff-retrieval-api-details.md (Lines 207-226)
-* [ ] Step 4.3: Validate new test and load suites
+* [x] Step 4.3: Validate new test and load suites
   * Details: .copilot-tracking/details/2026-06-29/story-layer1-e2-s4-region-diff-retrieval-api-details.md (Lines 227-233)
 
-### [ ] Implementation Phase 5: Final Validation
+### [x] Implementation Phase 5: Final Validation
 
 <!-- parallelizable: false -->
 
-* [ ] Step 5.1: Run full project validation
+* [x] Step 5.1: Run full project validation
   * Execute `npm run lint`, `npm run build`, and `npm run test`
   * Details: .copilot-tracking/details/2026-06-29/story-layer1-e2-s4-region-diff-retrieval-api-details.md (Lines 239-247)
-* [ ] Step 5.2: Fix minor lint, type, and test issues introduced by implementation
+* [x] Step 5.2: Fix minor lint, type, and test issues introduced by implementation
   * Details: .copilot-tracking/details/2026-06-29/story-layer1-e2-s4-region-diff-retrieval-api-details.md (Lines 248-251)
-* [ ] Step 5.3: Report unresolved blockers and follow-on planning needs
+* [x] Step 5.3: Report unresolved blockers and follow-on planning needs
   * Details: .copilot-tracking/details/2026-06-29/story-layer1-e2-s4-region-diff-retrieval-api-details.md (Lines 252-254)
 
 ## Planning Log

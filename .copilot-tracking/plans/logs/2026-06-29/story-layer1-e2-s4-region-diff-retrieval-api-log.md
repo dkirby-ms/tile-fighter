@@ -34,6 +34,21 @@ Gaps and differences identified between research findings and the implementation
   * Plan implements: Starts with a lightweight load harness and defers a reproducible benchmark profile to follow-on work.
   * Rationale: Provides immediate signal for correctness and basic performance while reserving environment-dependent benchmarking for a dedicated phase.
 
+* DD-03: Validation workspace identifier differs from plan command examples.
+  * Plan specifies: `npm run --workspace @tile-fighter/server ...`
+  * Implementation differs: Executed equivalent commands with `--workspace @game/server`.
+  * Rationale: Repository workspace package name is `@game/server`; `@tile-fighter/server` is not present.
+
+* DD-04: Phase-local validation test targets were not yet present when commands were executed.
+  * Plan specifies: run focused `region-diff` unit and integration tests in Phase 2 and Phase 3.
+  * Implementation differs: Commands returned no matching test files because those files are created in Phase 4.
+  * Rationale: Plan sequencing intentionally stages new tests in Phase 4, so focused commands become valid only after test authoring.
+
+* DD-05: Tile repository unit-test compatibility required post-implementation guardrails.
+  * Plan specifies: add transactionally atomic region version + delta persistence hooks to tile mutation paths.
+  * Implementation differs: Added compatibility guards for DB doubles lacking full Kysely `transaction`/`selectFrom` support.
+  * Rationale: Preserve existing unit-test contract while keeping production transactional behavior intact.
+
 ## Implementation Paths Considered
 
 ### Selected: POST /api/regions/diff with region watermark and append-only delta log
@@ -75,3 +90,15 @@ Gaps and differences identified between research findings and the implementation
 * WI-05: Expand load scenario into reproducible benchmark profile for CI/non-CI environments (P2)
   * Source: DD-02
   * Dependency: Baseline performance targets and environment provisioning.
+
+* WI-06: Add focused persistence unit/integration tests for region version bump and tile delta append invariants (P2)
+  * Source: Implementation Phase 1 completion report
+  * Dependency: Region diff service and route stabilization to avoid test churn.
+
+* WI-07: Externalize region diff route defaults (viewport cap and maxTiles defaults/caps) into config for operations tuning (P2)
+  * Source: Implementation Phase 3 completion report
+  * Dependency: Product/operations agreement on request-bound envelopes.
+
+* WI-08: Add targeted tile repository tests for region version and tile delta persistence behavior under real transaction-capable DB integration fixtures (P2)
+  * Source: DD-05
+  * Dependency: Test fixture support for region_versions/tile_deltas verification assertions.

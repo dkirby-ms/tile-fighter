@@ -211,4 +211,46 @@ export class TelemetrySink {
       timestamp: new Date().toISOString()
     });
   }
+
+  /**
+   * Emit tile_diff_requested when a region diff request is evaluated.
+   */
+  async emitTileDiffRequested(
+    regionId: string,
+    sinceVersion: number,
+    currentVersion: number | null,
+    viewportArea: number
+  ): Promise<void> {
+    await this.emit("tile_diff_requested", {
+      region_id: regionId,
+      since_version: sinceVersion,
+      current_version: currentVersion,
+      viewport_area: viewportArea,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  /**
+   * Emit tile_diff_returned when a region diff response is assembled.
+   */
+  async emitTileDiffReturned(
+    regionId: string,
+    sinceVersion: number,
+    currentVersion: number,
+    viewportArea: number,
+    tileCount: number,
+    truncated: boolean,
+    durationMs: number
+  ): Promise<void> {
+    await this.emit("tile_diff_returned", {
+      region_id: regionId,
+      since_version: sinceVersion,
+      current_version: currentVersion,
+      viewport_area: viewportArea,
+      tile_count: tileCount,
+      truncated,
+      duration_ms: durationMs,
+      timestamp: new Date().toISOString()
+    });
+  }
 }

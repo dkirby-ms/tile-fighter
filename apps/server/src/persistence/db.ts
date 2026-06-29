@@ -46,11 +46,35 @@ type RegionSnapshotTilesTable = {
   owner_id: string;
 };
 
+type RegionVersionsTable = {
+  region_id: string;
+  current_version: string;
+  updated_at: Date;
+};
+
+type TileDeltasTable = {
+  id: string;
+  region_id: string;
+  version: string;
+  cell_x: number;
+  cell_y: number;
+  operation: string;
+  offset_x: number | null;
+  offset_y: number | null;
+  shape: string | null;
+  color: string | null;
+  style_payload: unknown | null;
+  owner_id: string | null;
+  changed_at: Date;
+};
+
 export type ServerDatabase = {
   match_events: MatchEventsTable;
   tiles: TilesTable;
   region_snapshots: RegionSnapshotsTable;
   region_snapshot_tiles: RegionSnapshotTilesTable;
+  region_versions: RegionVersionsTable;
+  tile_deltas: TileDeltasTable;
 };
 
 export type TilesSelect = Selectable<TilesTable>;
@@ -60,6 +84,10 @@ export type RegionSnapshotsSelect = Selectable<RegionSnapshotsTable>;
 export type RegionSnapshotsInsert = Insertable<RegionSnapshotsTable>;
 export type RegionSnapshotTilesSelect = Selectable<RegionSnapshotTilesTable>;
 export type RegionSnapshotTilesInsert = Insertable<RegionSnapshotTilesTable>;
+export type RegionVersionsSelect = Selectable<RegionVersionsTable>;
+export type RegionVersionsInsert = Insertable<RegionVersionsTable>;
+export type TileDeltasSelect = Selectable<TileDeltasTable>;
+export type TileDeltasInsert = Insertable<TileDeltasTable>;
 
 export type DatabaseRuntime = {
   db: Kysely<ServerDatabase>;
