@@ -1,4 +1,4 @@
-import { Kysely, PostgresDialect, sql } from "kysely";
+import { Kysely, PostgresDialect, sql, Selectable, Insertable, Updateable } from "kysely";
 import { Pool } from "pg";
 import { readinessSql } from "@game/shared-persistence";
 
@@ -10,9 +10,28 @@ type MatchEventsTable = {
   created_at: Date;
 };
 
+type TilesTable = {
+  id: number;
+  region_id: string;
+  cell_x: number;
+  cell_y: number;
+  offset_x: number;
+  offset_y: number;
+  shape: string;
+  color: string;
+  style_payload: unknown;
+  owner_id: string;
+  created_at: Date;
+};
+
 export type ServerDatabase = {
   match_events: MatchEventsTable;
+  tiles: TilesTable;
 };
+
+export type TilesSelect = Selectable<TilesTable>;
+export type TilesInsert = Insertable<TilesTable>;
+export type TilesUpdate = Updateable<TilesTable>;
 
 export type DatabaseRuntime = {
   db: Kysely<ServerDatabase>;
