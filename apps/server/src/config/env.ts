@@ -1,7 +1,11 @@
 import { config as loadDotEnv } from "dotenv";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { z } from "zod";
 
-loadDotEnv();
+const runtimeEnvPath = resolve(dirname(fileURLToPath(import.meta.url)), "../../../../.env");
+
+loadDotEnv({ path: runtimeEnvPath });
 
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
@@ -10,11 +14,19 @@ const envSchema = z.object({
   ENTRA_ISSUER: z.string().url(),
   ENTRA_AUDIENCE: z.string().min(1),
   ENTRA_JWKS_URL: z.string().url(),
+  ENTRA_TOKEN_VERSION: z.enum(["1.0", "2.0"]).default("2.0"),
   TENANT_MODE: z.enum(["single", "multi", "both"]).default("single"),
   ENTRA_TENANT_ID: z.string().optional(),
   ALLOWED_TENANT_IDS: z.string().optional(),
   DENIED_TENANT_IDS: z.string().optional(),
-  ALLOWED_ISSUERS: z.string().optional()
+  ALLOWED_ISSUERS: z.string().optional(),
+  TELEMETRY_SINK_MODE: z.enum(["off", "optional", "required"]).default("optional"),
+  TELEMETRY_SINK_URL: z.preprocess((value) => (value === "" ? undefined : value), z.string().url().optional()),
+  TELEMETRY_SINK_NAME: z.string().optional(),
+  JOIN_TOKEN_SIGNING_SECRET: z.string().min(32),
+  JOIN_TOKEN_TTL_SECONDS: z.coerce.number().int().positive().max(120).default(120),
+  SESSION_HEARTBEAT_TTL_SECONDS: z.coerce.number().int().positive().default(30),
+  SESSION_CLEANUP_INTERVAL_SECONDS: z.coerce.number().int().positive().default(10)
 });
 
 export type RuntimeConfig = {
@@ -24,11 +36,19 @@ export type RuntimeConfig = {
   entraIssuer: string;
   entraAudience: string;
   entraJwksUrl: string;
+  entraTokenVersion: "1.0" | "2.0";
   tenantMode: "single" | "multi" | "both";
   entraTenantId?: string;
   allowedTenantIds: string[];
   deniedTenantIds: string[];
   allowedIssuers: string[];
+  telemetrySinkMode: "off" | "optional" | "required";
+  telemetrySinkUrl?: string;
+  telemetrySinkName?: string;
+  joinTokenSigningSecret: string;
+  joinTokenTtlSeconds: number;
+  sessionHeartbeatTtlSeconds: number;
+  sessionCleanupIntervalSeconds: number;
 };
 
 function splitCsv(input?: string): string[] {
@@ -45,6 +65,10 @@ export function readRuntimeConfig(): RuntimeConfig {
     throw new Error("ENTRA_TENANT_ID is required when TENANT_MODE is single");
   }
 
+  if (parsed.TELEMETRY_SINK_MODE === "required" && !parsed.TELEMETRY_SINK_URL) {
+    throw new Error("TELEMETRY_SINK_URL is required when TELEMETRY_SINK_MODE is required");
+  }
+
   return {
     nodeEnv: parsed.NODE_ENV,
     port: parsed.PORT,
@@ -52,10 +76,18 @@ export function readRuntimeConfig(): RuntimeConfig {
     entraIssuer: parsed.ENTRA_ISSUER,
     entraAudience: parsed.ENTRA_AUDIENCE,
     entraJwksUrl: parsed.ENTRA_JWKS_URL,
+    entraTokenVersion: parsed.ENTRA_TOKEN_VERSION,
     tenantMode: parsed.TENANT_MODE,
     ...(parsed.ENTRA_TENANT_ID ? { entraTenantId: parsed.ENTRA_TENANT_ID } : {}),
     allowedTenantIds: splitCsv(parsed.ALLOWED_TENANT_IDS),
     deniedTenantIds: splitCsv(parsed.DENIED_TENANT_IDS),
-    allowedIssuers: splitCsv(parsed.ALLOWED_ISSUERS)
+    allowedIssuers: splitCsv(parsed.ALLOWED_ISSUERS),
+    telemetrySinkMode: parsed.TELEMETRY_SINK_MODE,
+    ...(parsed.TELEMETRY_SINK_URL ? { telemetrySinkUrl: parsed.TELEMETRY_SINK_URL } : {}),
+    ...(parsed.TELEMETRY_SINK_NAME ? { telemetrySinkName: parsed.TELEMETRY_SINK_NAME } : {}),
+    joinTokenSigningSecret: parsed.JOIN_TOKEN_SIGNING_SECRET,
+    joinTokenTtlSeconds: parsed.JOIN_TOKEN_TTL_SECONDS,
+    sessionHeartbeatTtlSeconds: parsed.SESSION_HEARTBEAT_TTL_SECONDS,
+    sessionCleanupIntervalSeconds: parsed.SESSION_CLEANUP_INTERVAL_SECONDS
   };
 }

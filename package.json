@@ -8,6 +8,7 @@
     "packages/*"
   ],
   "scripts": {
+    "dev": "npm run -w @game/server dev",
     "build": "tsc -b",
     "lint": "npm run --workspaces lint",
     "test": "npm run --workspaces test"

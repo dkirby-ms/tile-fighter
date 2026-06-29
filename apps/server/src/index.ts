@@ -1,5 +1,5 @@
 import http from "node:http";
-import { Server } from "colyseus";
+import { Server } from "@colyseus/core";
 import { WebSocketTransport } from "@colyseus/ws-transport";
 import { ReadinessReport } from "@game/shared-types";
 import { AuthService } from "./auth/auth-service.js";
@@ -13,6 +13,8 @@ import {
 } from "./persistence/db.js";
 import { ArenaRoom } from "./rooms/arena.room.js";
 import { registerGracefulShutdown } from "./shutdown/graceful-shutdown.js";
+import { TelemetrySink } from "./telemetry/telemetry-sink.js";
+import { SessionLifecycleService } from "./session/session-lifecycle.service.js";
 
 async function bootstrap(): Promise<void> {
   const runtimeConfig = readRuntimeConfig();
@@ -20,6 +22,13 @@ async function bootstrap(): Promise<void> {
   await verifyDatabaseConnectivity(dbRuntime.db);
 
   const authService = new AuthService(runtimeConfig);
+  const telemetrySink = new TelemetrySink(runtimeConfig);
+  const lifecycleService = new SessionLifecycleService({
+    heartbeatTtlSeconds: runtimeConfig.sessionHeartbeatTtlSeconds,
+    cleanupIntervalSeconds: runtimeConfig.sessionCleanupIntervalSeconds,
+    telemetrySink
+  });
+  lifecycleService.start();
 
   const readinessCheck = async (): Promise<ReadinessReport> => {
     try {
@@ -44,7 +53,10 @@ async function bootstrap(): Promise<void> {
 
   const app = createHttpApp({
     readinessCheck,
-    authMiddleware: buildAuthMiddleware(authService)
+    authMiddleware: buildAuthMiddleware(authService),
+    telemetrySink,
+    authService,
+    lifecycleService
   });
 
   const nodeServer = http.createServer(app);
@@ -52,13 +64,14 @@ async function bootstrap(): Promise<void> {
     transport: new WebSocketTransport({ server: nodeServer })
   });
 
-  gameServer.define("arena", ArenaRoom, { authService });
+  gameServer.define("arena", ArenaRoom, { authService, lifecycleService });
 
   nodeServer.listen(runtimeConfig.port, () => {
     process.stdout.write(`Server listening on port ${runtimeConfig.port}\n`);
   });
 
   registerGracefulShutdown(async () => {
+    lifecycleService.stop();
     await gameServer.gracefullyShutdown();
     await new Promise<void>((resolve, reject) => {
       nodeServer.close((error) => {

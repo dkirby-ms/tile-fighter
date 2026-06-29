@@ -14,6 +14,9 @@
       "path": "apps/tools"
     },
     {
+      "path": "apps/client"
+    },
+    {
       "path": "apps/server"
     }
   ]

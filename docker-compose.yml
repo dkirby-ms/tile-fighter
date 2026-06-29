@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:18.4-alpine
+    container_name: tile-fighter-postgres
+    environment:
+      POSTGRES_DB: tile_fighter
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - tile_fighter_postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d tile_fighter"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  tile_fighter_postgres_data:

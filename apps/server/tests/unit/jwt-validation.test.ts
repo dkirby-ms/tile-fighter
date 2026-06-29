@@ -15,6 +15,7 @@ const baseConfig: JwtValidationConfig = {
   issuer: "https://issuer.example/v2.0",
   audience: "api://tile-fighter-server",
   algorithms: ["RS256"],
+  acceptedTokenVersion: "2.0",
   tenantMode: "single",
   singleTenantId: "tenant-a",
   allowedTenantIds: [],
@@ -41,6 +42,7 @@ function createToken(overrides: Partial<jwt.SignOptions> = {}, payload: Record<s
   return jwt.sign(
     {
       tid: "tenant-a",
+      ver: "2.0",
       ...payload
     },
     privateKeyPem,
@@ -63,6 +65,7 @@ describe("JwtValidator", () => {
 
     const principal = await validator.validate(token);
     expect(principal.subject).toBe("player-1");
+    expect(principal.tenantScopedSubject).toBe("tenant-a|player-1");
     expect(principal.tenantId).toBe("tenant-a");
   });
 
@@ -82,6 +85,12 @@ describe("JwtValidator", () => {
     const validator = buildValidator();
     const token = createToken({ expiresIn: "-1s" });
     await expect(validator.validate(token)).rejects.toThrow();
+  });
+
+  it("rejects token with wrong token version", async () => {
+    const validator = buildValidator();
+    const token = createToken({}, { ver: "1.0" });
+    await expect(validator.validate(token)).rejects.toThrow("Token version is not accepted");
   });
 
   it("rejects alg none token", async () => {
