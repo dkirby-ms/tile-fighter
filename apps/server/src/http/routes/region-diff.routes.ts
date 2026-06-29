@@ -1,5 +1,6 @@
 import { Router } from "express";
 import {
+  DEFAULT_REGION_DIFF_POLICY,
   RegionDiffOperation,
   RegionDiffRequest,
   RegionDiffResponse
@@ -12,6 +13,12 @@ type RegionDiffPrincipal = {
 
 export type RegionDiffRoutesDependencies = {
   regionDiffService: RegionDiffService;
+  isRegionMember: (input: { tenantScopedSubject: string; regionId: string }) => boolean;
+  limits: {
+    defaultMaxTiles: number;
+    maxTilesPerRequest: number;
+    maxViewportArea: number;
+  };
 };
 
 type ValidRegionDiffPayload = {
@@ -25,10 +32,6 @@ type ValidRegionDiffPayload = {
   };
   maxTiles: number;
 };
-
-const DEFAULT_MAX_TILES = 500;
-const MAX_MAX_TILES = 1_000;
-const MAX_VIEWPORT_AREA = 10_000;
 
 function asPrincipal(value: unknown): RegionDiffPrincipal | null {
   if (
@@ -52,7 +55,10 @@ function isRegionDiffOperation(value: string): value is RegionDiffOperation {
   return value === "upsert" || value === "delete";
 }
 
-function parseRegionDiffRequest(body: unknown): ValidRegionDiffPayload | null {
+function parseRegionDiffRequest(
+  body: unknown,
+  limits: RegionDiffRoutesDependencies["limits"]
+): ValidRegionDiffPayload | null {
   if (typeof body !== "object" || body === null) {
     return null;
   }
@@ -85,12 +91,12 @@ function parseRegionDiffRequest(body: unknown): ValidRegionDiffPayload | null {
   }
 
   const viewportArea = (viewport.maxCellX - viewport.minCellX + 1) * (viewport.maxCellY - viewport.minCellY + 1);
-  if (viewportArea <= 0 || viewportArea > MAX_VIEWPORT_AREA) {
+  if (viewportArea <= 0 || viewportArea > limits.maxViewportArea) {
     return null;
   }
 
-  const maxTilesCandidate = value.maxTiles ?? DEFAULT_MAX_TILES;
-  if (!isInteger(maxTilesCandidate) || maxTilesCandidate <= 0 || maxTilesCandidate > MAX_MAX_TILES) {
+  const maxTilesCandidate = value.maxTiles ?? limits.defaultMaxTiles;
+  if (!isInteger(maxTilesCandidate) || maxTilesCandidate <= 0 || maxTilesCandidate > limits.maxTilesPerRequest) {
     return null;
   }
 
@@ -117,9 +123,18 @@ export function createRegionDiffRoutes(dependencies: RegionDiffRoutesDependencie
       return;
     }
 
-    const payload = parseRegionDiffRequest(req.body);
+    const payload = parseRegionDiffRequest(req.body, dependencies.limits);
     if (!payload) {
       res.status(400).json({ error: "Invalid region diff request" });
+      return;
+    }
+
+    const isRegionMember = dependencies.isRegionMember({
+      tenantScopedSubject: principal.tenantScopedSubject,
+      regionId: payload.regionId
+    });
+    if (!isRegionMember) {
+      res.status(403).json({ error: "Forbidden" });
       return;
     }
 
@@ -153,7 +168,15 @@ export function createRegionDiffRoutes(dependencies: RegionDiffRoutesDependencie
       metadata: {
         viewport: payload.viewport,
         maxTiles: payload.maxTiles,
-        returnedTileCount: result.tiles.length
+        returnedTileCount: result.tiles.length,
+        policy: {
+          ...DEFAULT_REGION_DIFF_POLICY,
+          limits: {
+            defaultMaxTiles: dependencies.limits.defaultMaxTiles,
+            maxTilesPerRequest: dependencies.limits.maxTilesPerRequest,
+            maxViewportArea: dependencies.limits.maxViewportArea
+          }
+        }
       }
     };
 

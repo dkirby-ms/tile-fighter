@@ -1,5 +1,10 @@
 import { NextFunction, Request, Response } from "express";
 import { AuthService } from "../auth/auth-service.js";
+import {
+  DEFAULT_OPERATOR_CLAIM_CONTRACT,
+  OperatorClaimContract,
+  OperatorClaimSource
+} from "@game/shared-types";
 
 type OperatorAwarePrincipal = {
   roles?: unknown;
@@ -7,9 +12,6 @@ type OperatorAwarePrincipal = {
   wids?: unknown;
   scp?: unknown;
 };
-
-const OPERATOR_ROLE_VALUES = new Set(["operator", "ops", "admin"]);
-const OPERATOR_SCOPE_VALUES = new Set(["ops", "admin"]);
 
 function asStringArray(value: unknown): string[] {
   if (!Array.isArray(value)) {
@@ -19,32 +21,58 @@ function asStringArray(value: unknown): string[] {
   return value.filter((entry): entry is string => typeof entry === "string");
 }
 
-function hasOperatorRole(principal: OperatorAwarePrincipal): boolean {
+function hasOperatorRole(principal: OperatorAwarePrincipal, contract: OperatorClaimContract): boolean {
   const roleLikeClaims = [
     ...asStringArray(principal.roles),
     ...asStringArray(principal.groups),
     ...asStringArray(principal.wids)
   ];
 
+  const roleValues = new Set(contract.roleValues.map((value) => value.toLowerCase()));
   const hasRoleMatch = roleLikeClaims.some((claim) =>
-    OPERATOR_ROLE_VALUES.has(claim.toLowerCase())
+    roleValues.has(claim.toLowerCase())
   );
-  if (hasRoleMatch) {
-    return true;
-  }
+  return hasRoleMatch;
+}
 
+function hasOperatorScope(principal: OperatorAwarePrincipal, contract: OperatorClaimContract): boolean {
   if (typeof principal.scp !== "string") {
     return false;
   }
 
+  const scopeValues = new Set(contract.scopeValues.map((value) => value.toLowerCase()));
   return principal.scp
     .split(" ")
-    .some((scope) => OPERATOR_SCOPE_VALUES.has(scope.toLowerCase()));
+    .some((scope) => scopeValues.has(scope.toLowerCase()));
 }
 
-function withAuthorizationFlag<T extends object>(principal: T): T & { authorization: { isOperator: boolean } } {
+function resolveOperatorAuthorization(
+  principal: OperatorAwarePrincipal,
+  contract: OperatorClaimContract
+): boolean {
+  const source: OperatorClaimSource = contract.source;
+
+  if (source === "roles") {
+    return hasOperatorRole(principal, contract);
+  }
+
+  if (source === "scopes") {
+    return hasOperatorScope(principal, contract);
+  }
+
+  if (hasOperatorRole(principal, contract)) {
+    return true;
+  }
+
+  return hasOperatorScope(principal, contract);
+}
+
+function withAuthorizationFlag<T extends object>(
+  principal: T,
+  operatorClaimContract: OperatorClaimContract
+): T & { authorization: { isOperator: boolean } } {
   const operatorAware = principal as T & OperatorAwarePrincipal;
-  const isOperator = hasOperatorRole(operatorAware);
+  const isOperator = resolveOperatorAuthorization(operatorAware, operatorClaimContract);
 
   return {
     ...principal,
@@ -52,7 +80,10 @@ function withAuthorizationFlag<T extends object>(principal: T): T & { authorizat
   };
 }
 
-export function buildAuthMiddleware(authService: AuthService) {
+export function buildAuthMiddleware(
+  authService: AuthService,
+  operatorClaimContract: OperatorClaimContract = DEFAULT_OPERATOR_CLAIM_CONTRACT
+) {
   return async function authMiddleware(
     req: Request,
     res: Response,
@@ -63,7 +94,7 @@ export function buildAuthMiddleware(authService: AuthService) {
 
     try {
       const principal = await authService.verifyAccessToken(token);
-      res.locals.principal = withAuthorizationFlag(principal);
+      res.locals.principal = withAuthorizationFlag(principal, operatorClaimContract);
       next();
     } catch {
       res.status(401).json({ error: "Unauthorized" });

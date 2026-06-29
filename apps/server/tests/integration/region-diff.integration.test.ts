@@ -14,16 +14,24 @@ import {
 import { createTileRepository } from "../../src/persistence/tile.repository.js";
 import { createRegionDiffRepository } from "../../src/persistence/region-diff.repository.js";
 import { createRegionDiffService } from "../../src/domain/region-diff.service.js";
+import { createIntegrationTestDbGuard } from "./test-db-guard.js";
 
 describe("Region diff integration", () => {
-  const testDbConnectionString =
-    process.env.TEST_DATABASE_URL ?? "postgresql://postgres:postgres@localhost:5432/tile_fighter_test";
+  const dbGuard = createIntegrationTestDbGuard("region-diff.integration");
+  const testDbConnectionString = dbGuard.testDbConnectionString;
 
   let runtime: DatabaseRuntime | null = null;
   let db: Kysely<ServerDatabase> | null = null;
-  let testsCanRun = true;
+  let testsCanRun = dbGuard.testsCanRun;
 
   beforeAll(async () => {
+    if (!testsCanRun) {
+      if (dbGuard.skipReason) {
+        console.warn(dbGuard.skipReason);
+      }
+      return;
+    }
+
     try {
       runtime = createDatabaseRuntime(testDbConnectionString);
       db = runtime.db;
@@ -53,7 +61,7 @@ describe("Region diff integration", () => {
     await db.deleteFrom("tiles").execute();
   });
 
-  function createApp(authEnabled = true) {
+  function createApp(authEnabled = true, tenantScopedSubject = "tenant-a|player-1") {
     const telemetrySink = {
       emit: vi.fn(async () => undefined),
       emitTileDiffRequested: vi.fn(async () => undefined),
@@ -68,7 +76,7 @@ describe("Region diff integration", () => {
 
         return {
           subject: "player-1",
-          tenantScopedSubject: "tenant-a|player-1",
+          tenantScopedSubject,
           issuer: "https://issuer.example",
           audience: "api://tile-fighter-server",
           tenantId: "tenant-a",
@@ -84,6 +92,7 @@ describe("Region diff integration", () => {
       cleanupIntervalSeconds: 5,
       telemetrySink
     });
+    lifecycleService.noteRoomJoin("tenant-a|player-1", "region-diff-a");
 
     const tileRepository = createTileRepository();
     const regionDiffService = createRegionDiffService({
@@ -106,7 +115,12 @@ describe("Region diff integration", () => {
       lifecycleService,
       db: db!,
       tileRepository,
-      regionDiffService
+      regionDiffService,
+      regionDiffLimits: {
+        defaultMaxTiles: 2,
+        maxTilesPerRequest: 3,
+        maxViewportArea: 25
+      }
     });
   }
 
@@ -128,6 +142,19 @@ describe("Region diff integration", () => {
     }
   }
 
+  async function deleteTile(input: { cellX: number; cellY: number }) {
+    const result = await createTileRepository().deleteTile(db!, {
+      regionId: "region-diff-a",
+      cellX: input.cellX,
+      cellY: input.cellY,
+      ownerId: "tenant-a|player-1"
+    });
+
+    if (!result.ok) {
+      throw new Error(`fixture delete failed: ${result.reason}`);
+    }
+  }
+
   it.skipIf(!testsCanRun || !db)("returns 401 when Authorization header is missing", async () => {
     const app = createApp();
 
@@ -143,6 +170,27 @@ describe("Region diff integration", () => {
     });
 
     expect(response.status).toBe(401);
+  });
+
+  it.skipIf(!testsCanRun || !db)("returns 403 for authenticated non-member", async () => {
+    const app = createApp(true, "tenant-a|player-2");
+
+    const response = await request(app)
+      .post("/api/regions/diff")
+      .set("Authorization", "Bearer valid-token")
+      .send({
+        regionId: "region-diff-a",
+        sinceVersion: 0,
+        viewport: {
+          minCellX: 0,
+          maxCellX: 4,
+          minCellY: 0,
+          maxCellY: 4
+        }
+      });
+
+    expect(response.status).toBe(403);
+    expect(response.body).toEqual({ error: "Forbidden" });
   });
 
   it.skipIf(!testsCanRun || !db)("returns 400 for malformed payload", async () => {
@@ -221,10 +269,10 @@ describe("Region diff integration", () => {
         regionId: "region-diff-a",
         sinceVersion: 0,
         viewport: {
-          minCellX: 0,
-          maxCellX: 10,
-          minCellY: 0,
-          maxCellY: 10
+          minCellX: 5,
+          maxCellX: 9,
+          minCellY: 5,
+          maxCellY: 9
         },
         maxTiles: 2
       });
@@ -255,12 +303,100 @@ describe("Region diff integration", () => {
     expect(response.body.metadata).toEqual({
       viewport: {
         minCellX: 0,
-        maxCellX: 10,
+        maxCellX: 4,
         minCellY: 0,
-        maxCellY: 10
+        maxCellY: 4
       },
       maxTiles: 2,
-      returnedTileCount: 2
+      returnedTileCount: 2,
+      policy: {
+        limits: {
+          defaultMaxTiles: 2,
+          maxTilesPerRequest: 3,
+          maxViewportArea: 25
+        },
+        deleteSemantics: "explicit_delete_ops",
+        requiresRegionMembership: true
+      }
     });
+  });
+
+  it.skipIf(!testsCanRun || !db)("returns 400 when viewport area exceeds configured max", async () => {
+    const app = createApp();
+
+    const response = await request(app)
+      .post("/api/regions/diff")
+      .set("Authorization", "Bearer valid-token")
+      .send({
+        regionId: "region-diff-a",
+        sinceVersion: 0,
+        viewport: {
+          minCellX: 0,
+          maxCellX: 5,
+          minCellY: 0,
+          maxCellY: 5
+        }
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({ error: "Invalid region diff request" });
+  });
+
+  it.skipIf(!testsCanRun || !db)("returns 400 when maxTiles exceeds configured cap", async () => {
+    const app = createApp();
+
+    const response = await request(app)
+      .post("/api/regions/diff")
+      .set("Authorization", "Bearer valid-token")
+      .send({
+        regionId: "region-diff-a",
+        sinceVersion: 0,
+        viewport: {
+          minCellX: 0,
+          maxCellX: 4,
+          minCellY: 0,
+          maxCellY: 4
+        },
+        maxTiles: 4
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({ error: "Invalid region diff request" });
+  });
+
+  it.skipIf(!testsCanRun || !db)("returns delete operation for stale client after tile removal", async () => {
+    const app = createApp();
+
+    await placeTile({ cellX: 6, cellY: 6, color: "red" });
+    await deleteTile({ cellX: 6, cellY: 6 });
+
+    const response = await request(app)
+      .post("/api/regions/diff")
+      .set("Authorization", "Bearer valid-token")
+      .send({
+        regionId: "region-diff-a",
+        sinceVersion: 0,
+        viewport: {
+          minCellX: 0,
+          maxCellX: 4,
+          minCellY: 0,
+          maxCellY: 4
+        },
+        maxTiles: 2
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body.tiles).toEqual([
+      expect.objectContaining({
+        cellX: 6,
+        cellY: 6,
+        operation: "delete",
+        offsetX: null,
+        offsetY: null,
+        shape: null,
+        color: null,
+        ownerId: null
+      })
+    ]);
   });
 });

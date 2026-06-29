@@ -39,6 +39,8 @@ The `@game/server` package hosts the authoritative Colyseus backend and protecte
 * `TELEMETRY_SINK_MODE`
 * `TELEMETRY_SINK_URL`
 * `TELEMETRY_SINK_NAME`
+* `TILE_PLACE_THROTTLE_MAX_REQUESTS`
+* `TILE_PLACE_THROTTLE_WINDOW_MS`
 
 ## Health Endpoints
 
@@ -57,3 +59,19 @@ Migration stack uses `node-pg-migrate` via package scripts.
 
 * Apply migrations: `npm run -w @game/server migrate:up`
 * Roll back migrations: `npm run -w @game/server migrate:down`
+
+## Epic 2 Policy Defaults (Pending Final Decisions)
+
+These defaults remain active until decision register items PD-01 through PD-06 are finalized.
+
+* Placement throttle default: account-plus-region key, 60-second window, deterministic `429` rejection contract.
+* JWT operator contract default: role-first with bounded scope fallback during migration.
+* Region diff delete default: explicit `delete` operations are included for stale-client correctness.
+* Region diff limits default: conservative env-configurable caps are enforced server-side.
+* Region diff authorization default: active region membership required before diff retrieval.
+
+## Integration DB Behavior
+
+* Local runs may skip DB-dependent integration suites when DB prerequisites are unavailable.
+* CI runs enforce DB preconditions by requiring `TEST_DATABASE_URL` for integration-capable test runs.
+* If `CI=true` and `TEST_DATABASE_URL` is missing, DB-backed integration suites report explicit skip reasons and the workflow fails in the pre-test guard step.

@@ -78,7 +78,16 @@ async function bootstrap(): Promise<void> {
     db: dbRuntime.db,
     tileRepository,
     regionSnapshotService,
-    regionDiffService
+    regionDiffService,
+    tilePlaceThrottlePolicy: {
+      maxRequests: runtimeConfig.tilePlaceThrottleMaxRequests,
+      windowMs: runtimeConfig.tilePlaceThrottleWindowMs
+    },
+    regionDiffLimits: {
+      defaultMaxTiles: runtimeConfig.regionDiffDefaultMaxTiles,
+      maxTilesPerRequest: runtimeConfig.regionDiffMaxTilesPerRequest,
+      maxViewportArea: runtimeConfig.regionDiffMaxViewportArea
+    }
   });
 
   const nodeServer = http.createServer(app);

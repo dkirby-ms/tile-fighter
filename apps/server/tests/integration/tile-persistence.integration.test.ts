@@ -2,17 +2,32 @@ import { describe, expect, it, beforeAll, afterAll, beforeEach } from "vitest";
 import { Kysely } from "kysely";
 import { TileRepository } from "../../src/persistence/tile.repository.js";
 import { ServerDatabase, DatabaseRuntime, createDatabaseRuntime, closeDatabaseRuntime } from "../../src/persistence/db.js";
+import request from "supertest";
+import { createHttpApp } from "../../src/http/app.js";
+import { buildAuthMiddleware } from "../../src/http/auth-middleware.js";
+import { SessionLifecycleService } from "../../src/session/session-lifecycle.service.js";
+import { TelemetrySink } from "../../src/telemetry/telemetry-sink.js";
+import { createIntegrationTestDbGuard } from "./test-db-guard.js";
+import { vi } from "vitest";
 
 describe("Tile persistence integration", () => {
   let runtime: DatabaseRuntime | null = null;
   let db: Kysely<ServerDatabase> | null = null;
   let repository: TileRepository;
-  let testsCanRun = true;
+  const dbGuard = createIntegrationTestDbGuard("tile-persistence.integration");
+  let testsCanRun = dbGuard.testsCanRun;
 
   // Use test database connection string from environment or skip tests
-  const testDbConnectionString = process.env.TEST_DATABASE_URL || "postgresql://postgres:postgres@localhost:5432/tile_fighter_test";
+  const testDbConnectionString = dbGuard.testDbConnectionString;
 
   beforeAll(async () => {
+    if (!testsCanRun) {
+      if (dbGuard.skipReason) {
+        console.warn(dbGuard.skipReason);
+      }
+      return;
+    }
+
     try {
       // Create database runtime
       runtime = createDatabaseRuntime(testDbConnectionString);
@@ -27,6 +42,62 @@ describe("Tile persistence integration", () => {
       console.warn("Skipping integration tests: database not available", error instanceof Error ? error.message : error);
     }
   });
+
+  function createAppWithThrottle(maxRequests: number, windowMs: number) {
+    const telemetrySink = {
+      emit: vi.fn(async () => undefined),
+      emitTilePlaceRejected: vi.fn(async () => undefined),
+      emitTilePlaced: vi.fn(async () => undefined),
+      emitTileEdited: vi.fn(async () => undefined),
+      emitTilePlaceThrottled: vi.fn(async () => undefined)
+    } as unknown as TelemetrySink;
+
+    const authService = {
+      verifyAccessToken: vi.fn(async () => ({
+        subject: "player-1",
+        tenantScopedSubject: "tenant-a|player-1",
+        issuer: "https://issuer.example",
+        audience: "api://tile-fighter-server",
+        tenantId: "tenant-a",
+        tokenVersion: "2.0",
+        expiresAt: 1_900_000_000
+      })),
+      issueJoinToken: vi.fn()
+    };
+
+    const lifecycleService = new SessionLifecycleService({
+      heartbeatTtlSeconds: 30,
+      cleanupIntervalSeconds: 5,
+      telemetrySink
+    });
+
+    const app = createHttpApp({
+      readinessCheck: async () => ({
+        ok: true,
+        checks: {
+          database: "ok",
+          config: "ok"
+        }
+      }),
+      authMiddleware: buildAuthMiddleware(authService as never),
+      telemetrySink,
+      authService: authService as never,
+      lifecycleService,
+      db,
+      tileRepository: repository,
+      tilePlaceThrottlePolicy: {
+        maxRequests,
+        windowMs
+      }
+    });
+
+    return {
+      app,
+      telemetrySink: telemetrySink as {
+        emitTilePlaceThrottled: ReturnType<typeof vi.fn>;
+      }
+    };
+  }
 
   afterAll(async () => {
     // Close database connection
@@ -434,5 +505,42 @@ describe("Tile persistence integration", () => {
     const unchanged = await repository.selectTileByCoordinate(db, regionId, 9, 9);
     expect(unchanged?.shape).toBe("square");
     expect(unchanged?.color).toBe("red");
+  });
+
+  it.skipIf(!testsCanRun || !db)("should enforce placement throttle and recover after window", async () => {
+    const { app, telemetrySink } = createAppWithThrottle(2, 120);
+
+    const makePlacement = (cellX: number) =>
+      request(app)
+        .post("/api/tiles/place")
+        .set("Authorization", "Bearer valid-token")
+        .send({
+          regionId: "throttle-region-a",
+          cellX,
+          cellY: 0,
+          offsetX: 0,
+          offsetY: 0,
+          shape: "square",
+          color: "amber",
+          stylePayload: {}
+        });
+
+    const first = await makePlacement(11);
+    const second = await makePlacement(12);
+    const third = await makePlacement(13);
+
+    expect(first.status).toBe(201);
+    expect(second.status).toBe(201);
+    expect(third.status).toBe(429);
+    expect(third.body.ok).toBe(false);
+    expect(third.body.reason).toBe("throttled");
+    expect(typeof third.body.retryAfterMs).toBe("number");
+    expect(third.body.retryAfterMs).toBeGreaterThan(0);
+    expect(telemetrySink.emitTilePlaceThrottled).toHaveBeenCalledTimes(1);
+
+    await new Promise((resolve) => setTimeout(resolve, 140));
+
+    const recovery = await makePlacement(14);
+    expect(recovery.status).toBe(201);
   });
 });

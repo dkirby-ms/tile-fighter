@@ -14,6 +14,7 @@ import { ServerDatabase } from "../persistence/db.js";
 import { ITileRepository } from "../persistence/tile.repository.js";
 import { RegionSnapshotService } from "../domain/region-snapshot.service.js";
 import { RegionDiffService } from "../domain/region-diff.service.js";
+import { DEFAULT_REGION_DIFF_POLICY } from "@game/shared-types";
 
 export type HttpAppDependencies = {
   readinessCheck: () => Promise<ReadinessReport>;
@@ -25,11 +26,31 @@ export type HttpAppDependencies = {
   tileRepository?: ITileRepository;
   regionSnapshotService?: RegionSnapshotService;
   regionDiffService?: RegionDiffService;
+  tilePlaceThrottlePolicy?: {
+    maxRequests: number;
+    windowMs: number;
+  };
+  regionDiffLimits?: {
+    defaultMaxTiles: number;
+    maxTilesPerRequest: number;
+    maxViewportArea: number;
+  };
 };
 
 export function createHttpApp(dependencies: HttpAppDependencies) {
   const app = express();
   app.disable("x-powered-by");
+
+  const tilePlaceThrottlePolicy = dependencies.tilePlaceThrottlePolicy ?? {
+    maxRequests: 5,
+    windowMs: 60_000
+  };
+  const regionDiffLimits = dependencies.regionDiffLimits ?? {
+    defaultMaxTiles: DEFAULT_REGION_DIFF_POLICY.limits.defaultMaxTiles,
+    maxTilesPerRequest: DEFAULT_REGION_DIFF_POLICY.limits.maxTilesPerRequest,
+    maxViewportArea: DEFAULT_REGION_DIFF_POLICY.limits.maxViewportArea
+  };
+  const tilePlacementThrottleByKey = new Map<string, number[]>();
 
   app.use(express.json());
   app.use(createHealthRoutes(dependencies.readinessCheck));
@@ -45,7 +66,10 @@ export function createHttpApp(dependencies: HttpAppDependencies) {
   if (dependencies.regionDiffService) {
     app.use(
       createRegionDiffRoutes({
-        regionDiffService: dependencies.regionDiffService
+        regionDiffService: dependencies.regionDiffService,
+        isRegionMember: ({ tenantScopedSubject, regionId }) =>
+          dependencies.lifecycleService.isRegionMember(tenantScopedSubject, regionId),
+        limits: regionDiffLimits
       })
     );
   }
@@ -91,6 +115,37 @@ export function createHttpApp(dependencies: HttpAppDependencies) {
             ok: true as const,
             tileId: result.tile.id,
             createdAt: result.tile.createdAt
+          };
+        },
+        shouldThrottleTilePlace: async ({ key, nowMs, regionId, cellX, cellY, ownerId }) => {
+          const cutoff = nowMs - tilePlaceThrottlePolicy.windowMs;
+          const recentAttempts = (tilePlacementThrottleByKey.get(key) ?? []).filter(
+            (attemptedAtMs) => attemptedAtMs > cutoff
+          );
+
+          if (recentAttempts.length >= tilePlaceThrottlePolicy.maxRequests) {
+            const oldestAttemptInWindow = recentAttempts[0] ?? nowMs;
+            const retryAfterMs = Math.max(1, tilePlaceThrottlePolicy.windowMs - (nowMs - oldestAttemptInWindow));
+            await dependencies.telemetrySink.emitTilePlaceThrottled(
+              regionId,
+              cellX,
+              cellY,
+              ownerId,
+              retryAfterMs,
+              tilePlaceThrottlePolicy.windowMs,
+              tilePlaceThrottlePolicy.maxRequests
+            );
+            return {
+              throttled: true,
+              retryAfterMs
+            };
+          }
+
+          recentAttempts.push(nowMs);
+          tilePlacementThrottleByKey.set(key, recentAttempts);
+          return {
+            throttled: false,
+            retryAfterMs: 0
           };
         },
         editTile: async (input) => {

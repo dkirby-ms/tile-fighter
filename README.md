@@ -81,6 +81,11 @@ npm run -w @game/server test
 npm run -w @game/server test:load
 ```
 
+Integration database policy baseline for Epic 2 follow-up:
+
+- Local development may skip DB-dependent integration suites when DB prerequisites are unavailable.
+- CI defaults to strict DB precondition enforcement for required integration suites unless an explicit skip mode is documented and approved.
+
 ## Container Build and Run
 
 ```bash

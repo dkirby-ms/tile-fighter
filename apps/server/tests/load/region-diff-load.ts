@@ -46,6 +46,7 @@ describe("Region diff load scenario", () => {
       cleanupIntervalSeconds: 5,
       telemetrySink
     });
+    lifecycleService.noteRoomJoin("tenant-a|player-1", "arena-main");
 
     let callCount = 0;
     const regionDiffService = {

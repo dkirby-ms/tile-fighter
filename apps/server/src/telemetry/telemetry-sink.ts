@@ -135,6 +135,30 @@ export class TelemetrySink {
   }
 
   /**
+   * Emit tile_place_throttled event for policy rate-limit rejection outcomes.
+   */
+  async emitTilePlaceThrottled(
+    regionId: string,
+    cellX: number,
+    cellY: number,
+    attemptedOwnerId: string,
+    retryAfterMs: number,
+    throttleWindowMs: number,
+    throttleMaxRequests: number
+  ): Promise<void> {
+    await this.emit("tile_place_throttled", {
+      region_id: regionId,
+      cell_x: cellX,
+      cell_y: cellY,
+      attempted_owner_id: attemptedOwnerId,
+      retry_after_ms: retryAfterMs,
+      throttle_window_ms: throttleWindowMs,
+      throttle_max_requests: throttleMaxRequests,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  /**
    * Emit tile_edited event for story-level bounded edit success.
    */
   async emitTileEdited(

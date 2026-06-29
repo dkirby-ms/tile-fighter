@@ -29,7 +29,8 @@ describe("Load-focused authoritative placement and throttle paths", () => {
       emit: vi.fn(async () => undefined),
       emitTilePlaceRejected: vi.fn(async () => undefined),
       emitTilePlaced: vi.fn(async () => undefined),
-      emitTileEdited: vi.fn(async () => undefined)
+      emitTileEdited: vi.fn(async () => undefined),
+      emitTilePlaceThrottled: vi.fn(async () => undefined)
     } as unknown as TelemetrySink;
 
     let inserted = false;
@@ -104,14 +105,23 @@ describe("Load-focused authoritative placement and throttle paths", () => {
 
     const createdResponses = responses.filter((response) => response.status === 201);
     const occupiedResponses = responses.filter((response) => response.status === 409);
+    const throttledResponses = responses.filter((response) => response.status === 429);
 
     expect(createdResponses).toHaveLength(1);
-    expect(occupiedResponses).toHaveLength(attempts - 1);
+    expect(occupiedResponses.length + throttledResponses.length).toBe(attempts - 1);
+    expect(occupiedResponses.length).toBeGreaterThan(0);
+    expect(throttledResponses.length).toBeGreaterThan(0);
     for (const response of occupiedResponses) {
       expect(response.body).toEqual({ ok: false, reason: "occupied" });
     }
+    for (const response of throttledResponses) {
+      expect(response.body.ok).toBe(false);
+      expect(response.body.reason).toBe("throttled");
+      expect(typeof response.body.retryAfterMs).toBe("number");
+      expect(response.body.retryAfterMs).toBeGreaterThan(0);
+    }
 
-    expect(tileRepository.insertTile).toHaveBeenCalledTimes(attempts);
+    expect(tileRepository.insertTile).toHaveBeenCalledTimes(createdResponses.length + occupiedResponses.length);
   });
 
   it("exercises high-rate heartbeat throttle path under load", async () => {

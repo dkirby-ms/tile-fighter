@@ -1,14 +1,23 @@
 import { describe, expect, it, beforeAll, afterAll } from "vitest";
 import { sql } from "kysely";
 import { DatabaseRuntime, createDatabaseRuntime, closeDatabaseRuntime } from "../../src/persistence/db.js";
+import { createIntegrationTestDbGuard } from "./test-db-guard.js";
 
 describe("Startup migration smoke test", () => {
-  const testDbConnectionString = process.env.TEST_DATABASE_URL || "postgresql://postgres:postgres@localhost:5432/tile_fighter_test";
+  const dbGuard = createIntegrationTestDbGuard("startup-migration.smoke");
+  const testDbConnectionString = dbGuard.testDbConnectionString;
 
   let runtime: DatabaseRuntime | null = null;
-  let testsCanRun = true;
+  let testsCanRun = dbGuard.testsCanRun;
 
   beforeAll(async () => {
+    if (!testsCanRun) {
+      if (dbGuard.skipReason) {
+        console.warn(dbGuard.skipReason);
+      }
+      return;
+    }
+
     try {
       runtime = createDatabaseRuntime(testDbConnectionString);
       // Test connectivity - this will skip tests if database unavailable

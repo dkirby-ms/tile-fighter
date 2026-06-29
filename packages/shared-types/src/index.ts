@@ -4,6 +4,20 @@ export interface PrincipalAuthorization {
   isOperator: boolean;
 }
 
+export type OperatorClaimSource = "roles" | "scopes" | "roles_with_scope_fallback";
+
+export interface OperatorClaimContract {
+  source: OperatorClaimSource;
+  roleValues: readonly string[];
+  scopeValues: readonly string[];
+}
+
+export const DEFAULT_OPERATOR_CLAIM_CONTRACT: OperatorClaimContract = {
+  source: "roles_with_scope_fallback",
+  roleValues: ["operator", "ops", "admin"],
+  scopeValues: ["ops", "admin"]
+};
+
 export interface AuthenticatedPrincipal {
   subject: string;
   tenantScopedSubject: string;
@@ -53,6 +67,11 @@ export type TilePlaceResult =
   | {
       ok: false;
       reason: "occupied";
+    }
+  | {
+      ok: false;
+      reason: "throttled";
+      retryAfterMs: number;
     };
 
 export interface TileEditCommand {
@@ -91,6 +110,30 @@ export interface RegionDiffRequest {
 
 export type RegionDiffOperation = "upsert" | "delete";
 
+export interface RegionDiffLimits {
+  maxViewportArea: number;
+  maxTilesPerRequest: number;
+  defaultMaxTiles: number;
+}
+
+export type RegionDiffDeleteSemantics = "explicit_delete_ops" | "upsert_only";
+
+export interface RegionDiffPolicyMetadata {
+  limits: RegionDiffLimits;
+  deleteSemantics: RegionDiffDeleteSemantics;
+  requiresRegionMembership: boolean;
+}
+
+export const DEFAULT_REGION_DIFF_POLICY: RegionDiffPolicyMetadata = {
+  limits: {
+    maxViewportArea: 10_000,
+    maxTilesPerRequest: 1_000,
+    defaultMaxTiles: 500
+  },
+  deleteSemantics: "explicit_delete_ops",
+  requiresRegionMembership: true
+};
+
 export interface RegionDiffTileDelta {
   cellX: number;
   cellY: number;
@@ -117,5 +160,6 @@ export interface RegionDiffResponse {
     viewport: RegionDiffViewport;
     maxTiles: number;
     returnedTileCount: number;
+    policy: RegionDiffPolicyMetadata;
   };
 }

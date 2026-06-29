@@ -140,6 +140,10 @@ Playable Layer 1 means any authenticated player can open the web client, place t
 - Test requirements: unit (window policy), integration (place/edit/occupied), load (hot-cell contention).
 - Telemetry events required: `tile_placed`, `tile_place_rejected`, `tile_edited`.
 - Security and abuse checks required: per-account placement rate-limit; server-side owner check.
+- Policy defaults for this remediation cycle (pending PD-01 decision due 2026-07-02):
+  - Default placement throttle key is account plus region.
+  - Default throttle window is 60 seconds.
+  - Default rejection contract is HTTP 429 with deterministic error payload.
 - Dependencies: E2-S1.
 - Estimate: 5.
 - Confidence: Med.
@@ -170,6 +174,10 @@ Playable Layer 1 means any authenticated player can open the web client, place t
 - Test requirements: unit (diff assembler), integration (versioned diff), load (read amplification).
 - Telemetry events required: `tile_diff_requested`, `tile_diff_returned`.
 - Security and abuse checks required: query bounding and max payload limits.
+- Policy defaults for this remediation cycle (pending PD-03/PD-04/PD-05 decisions due 2026-07-02):
+  - Default diff delete semantics include explicit `delete` operations so stale clients can remove tiles deterministically.
+  - Default hard limits are env-configurable with conservative caps enforced server-side.
+  - Default authorization model requires active membership for the requested region before diff retrieval.
 - Dependencies: E2-S1.
 - Estimate: 3.
 - Confidence: Med.

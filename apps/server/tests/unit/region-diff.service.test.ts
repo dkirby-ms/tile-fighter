@@ -14,6 +14,9 @@ function createDelta(input: {
   shape?: string | null;
   color?: string | null;
 }): TileDeltasSelect {
+  const hasShape = Object.prototype.hasOwnProperty.call(input, "shape");
+  const hasColor = Object.prototype.hasOwnProperty.call(input, "color");
+
   return {
     id: input.id,
     region_id: "arena-main",
@@ -23,8 +26,8 @@ function createDelta(input: {
     operation: input.operation ?? "upsert",
     offset_x: 0,
     offset_y: 0,
-    shape: input.shape ?? "square",
-    color: input.color ?? "blue",
+    shape: hasShape ? (input.shape ?? null) : "square",
+    color: hasColor ? (input.color ?? null) : "blue",
     style_payload: { marker: input.id },
     owner_id: "tenant-a|player-1",
     changed_at: new Date("2026-06-29T12:00:00.000Z")
@@ -160,6 +163,49 @@ describe("RegionDiffService", () => {
       expect.objectContaining({ cellX: 2, cellY: 1, version: 5, color: "yellow" })
     ]);
     expect(result.nextSinceVersion).toBe(5);
+  });
+
+  it("returns delete delta when latest operation for a coordinate is delete", async () => {
+    const { service } = createService({
+      currentVersion: 4,
+      deltas: [
+        createDelta({ id: "1", version: "2", cellX: 7, cellY: 3, color: "red" }),
+        createDelta({
+          id: "2",
+          version: "4",
+          cellX: 7,
+          cellY: 3,
+          operation: "delete",
+          shape: null,
+          color: null
+        })
+      ]
+    });
+
+    const result = await service.getRegionDiff({
+      regionId: "arena-main",
+      sinceVersion: 1,
+      viewport: {
+        minCellX: 0,
+        maxCellX: 20,
+        minCellY: 0,
+        maxCellY: 20
+      },
+      maxTiles: 100
+    });
+
+    expect(result.tiles).toHaveLength(1);
+    expect(result.tiles[0]).toEqual(
+      expect.objectContaining({
+        cellX: 7,
+        cellY: 3,
+        version: 4,
+        operation: "delete",
+        shape: null,
+        color: null
+      })
+    );
+    expect(result.nextSinceVersion).toBe(4);
   });
 
   it("truncates to maxTiles and advances nextSinceVersion to the last returned tile", async () => {

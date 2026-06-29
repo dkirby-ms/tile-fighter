@@ -55,6 +55,17 @@ export type EditTileResult =
   | { ok: true; tile: { id: number; editedAt: Date } }
   | { ok: false; reason: "forbidden_owner_mismatch" | "edit_window_expired" };
 
+export type DeleteTileInput = {
+  regionId: string;
+  cellX: number;
+  cellY: number;
+  ownerId: string;
+};
+
+export type DeleteTileResult =
+  | { ok: true; tile: { id: number; deletedAt: Date } }
+  | { ok: false; reason: "forbidden_owner_mismatch" | "not_found" };
+
 /**
  * Tile Repository interface for data access
  */
@@ -67,6 +78,7 @@ export interface ITileRepository {
     db: Kysely<ServerDatabase>,
     input: EditTileInput
   ): Promise<EditTileResult>;
+  deleteTile(db: Kysely<ServerDatabase>, input: DeleteTileInput): Promise<DeleteTileResult>;
   selectTilesByRegion(
     db: Kysely<ServerDatabase>,
     regionId: string
@@ -284,6 +296,80 @@ export class TileRepository implements ITileRepository {
     return {
       ok: false,
       reason: "edit_window_expired"
+    };
+  }
+
+  async deleteTile(
+    db: Kysely<ServerDatabase>,
+    input: DeleteTileInput
+  ): Promise<DeleteTileResult> {
+    const now = new Date();
+
+    const deleted = await this.withTransaction(db, async (trx) => {
+      const deletedRow = await trx
+        .deleteFrom("tiles")
+        .where("region_id", "=", input.regionId)
+        .where("cell_x", "=", input.cellX)
+        .where("cell_y", "=", input.cellY)
+        .where("owner_id", "=", input.ownerId)
+        .returning(["id"])
+        .executeTakeFirst();
+
+      if (!deletedRow) {
+        return null;
+      }
+
+      if (this.canPersistRegionDiff(trx)) {
+        const nextVersion = await this.bumpRegionVersion(trx, input.regionId);
+
+        await trx
+          .insertInto("tile_deltas")
+          .values({
+            region_id: input.regionId,
+            version: String(nextVersion),
+            cell_x: input.cellX,
+            cell_y: input.cellY,
+            operation: "delete",
+            offset_x: null,
+            offset_y: null,
+            shape: null,
+            color: null,
+            style_payload: null,
+            owner_id: null
+          } as TileDeltasInsert)
+          .executeTakeFirst();
+      }
+
+      return deletedRow;
+    });
+
+    if (deleted) {
+      return {
+        ok: true,
+        tile: {
+          id: deleted.id,
+          deletedAt: now
+        }
+      };
+    }
+
+    const existing = await this.selectTileByCoordinate(
+      db,
+      input.regionId,
+      input.cellX,
+      input.cellY
+    );
+
+    if (!existing) {
+      return {
+        ok: false,
+        reason: "not_found"
+      };
+    }
+
+    return {
+      ok: false,
+      reason: "forbidden_owner_mismatch"
     };
   }
 

@@ -26,7 +26,8 @@ type PlaceTileInput = {
 
 type PlaceTileOutcome =
   | { ok: true; tileId: number; createdAt: Date }
-  | { ok: false; reason: "occupied" };
+  | { ok: false; reason: "occupied" }
+  | { ok: false; reason: "throttled"; retryAfterMs: number };
 
 type EditTileInput = {
   regionId: string;
@@ -47,6 +48,14 @@ type EditTileOutcome =
 export type TileRoutesDependencies = {
   placeTile: (input: PlaceTileInput) => Promise<PlaceTileOutcome>;
   editTile: (input: EditTileInput) => Promise<EditTileOutcome>;
+  shouldThrottleTilePlace: (input: {
+    key: string;
+    nowMs: number;
+    regionId: string;
+    cellX: number;
+    cellY: number;
+    ownerId: string;
+  }) => Promise<{ throttled: boolean; retryAfterMs: number }>;
 };
 
 function asPrincipal(value: unknown): TilePrincipal | null {
@@ -112,6 +121,25 @@ export function createTileRoutes(dependencies: TileRoutesDependencies): Router {
       return;
     }
 
+    const throttle = await dependencies.shouldThrottleTilePlace({
+      key: `${principal.tenantScopedSubject}:${req.body.regionId}`,
+      nowMs: Date.now(),
+      regionId: req.body.regionId,
+      cellX: req.body.cellX,
+      cellY: req.body.cellY,
+      ownerId: principal.tenantScopedSubject
+    });
+
+    if (throttle.throttled) {
+      const rejected: TilePlaceResult = {
+        ok: false,
+        reason: "throttled",
+        retryAfterMs: throttle.retryAfterMs
+      };
+      res.status(429).json(rejected);
+      return;
+    }
+
     const result = await dependencies.placeTile({
       regionId: req.body.regionId,
       cellX: req.body.cellX,
@@ -125,11 +153,21 @@ export function createTileRoutes(dependencies: TileRoutesDependencies): Router {
     });
 
     if (!result.ok) {
-      const occupied: TilePlaceResult = {
+      if (result.reason === "throttled") {
+        const rejected: TilePlaceResult = {
+          ok: false,
+          reason: "throttled",
+          retryAfterMs: result.retryAfterMs
+        };
+        res.status(429).json(rejected);
+        return;
+      }
+
+      const rejected: TilePlaceResult = {
         ok: false,
         reason: "occupied"
       };
-      res.status(409).json(occupied);
+      res.status(409).json(rejected);
       return;
     }
 

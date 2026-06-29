@@ -30,6 +30,13 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Verify integration DB precondition
+        run: |
+          if [ -z "$TEST_DATABASE_URL" ]; then
+            echo "TEST_DATABASE_URL is required for DB-backed integration suites in CI"
+            exit 1
+          fi
+
       - name: Test
         run: npm run test
 
