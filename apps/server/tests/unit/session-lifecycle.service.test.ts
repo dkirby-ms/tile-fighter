@@ -25,7 +25,7 @@ describe("SessionLifecycleService", () => {
     await service.cleanupStaleMetadata();
 
     expect(service.getPresenceCount()).toBe(0);
-    expect((telemetrySink.emit as ReturnType<typeof vi.fn>).mock.calls.some((call) => call[0] === "session_metadata_stale")).toBe(
+    expect((telemetrySink.emit as ReturnType<typeof vi.fn>).mock.calls.some((call) => call[0] === "presence_cleared")).toBe(
       true
     );
   });

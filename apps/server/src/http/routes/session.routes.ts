@@ -61,14 +61,14 @@ export function createSessionRoutes(dependencies: SessionRoutesDependencies): Ro
     try {
       const joinToken = dependencies.authService.issueJoinToken(principal.tenantScopedSubject, roomId);
 
-      await dependencies.telemetrySink.emit("session_join_token_issued", {
+      await dependencies.telemetrySink.emit("room_join_token_issued", {
         tenantScopedSubject: principal.tenantScopedSubject,
         roomId
       });
 
       res.status(200).json({ roomId, joinToken });
     } catch (error) {
-      await dependencies.telemetrySink.emit("session_join_token_failed", {
+      await dependencies.telemetrySink.emit("room_join_token_rejected", {
         tenantScopedSubject: principal.tenantScopedSubject,
         roomId,
         reasonClass: "join_token_issue_failed",

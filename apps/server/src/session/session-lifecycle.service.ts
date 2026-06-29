@@ -57,7 +57,7 @@ export class SessionLifecycleService {
       lastTransportEventAtMs: nowMs
     });
 
-    void this.telemetrySink.emit("session_transport_join", {
+    void this.telemetrySink.emit("session_heartbeat", {
       tenantScopedSubject,
       roomId
     });
@@ -70,7 +70,7 @@ export class SessionLifecycleService {
       this.presenceBySubject.delete(tenantScopedSubject);
     }
 
-    void this.telemetrySink.emit("session_transport_leave", {
+    void this.telemetrySink.emit("session_ended", {
       tenantScopedSubject,
       roomId
     });
@@ -112,7 +112,7 @@ export class SessionLifecycleService {
       }
 
       this.presenceBySubject.delete(subject);
-      await this.telemetrySink.emit("session_metadata_stale", {
+      await this.telemetrySink.emit("presence_cleared", {
         tenantScopedSubject: subject,
         roomId: presence.roomId,
         staleAfterSeconds: Math.floor(ageMs / 1000)
