@@ -30,7 +30,7 @@ describe("ExternalIdSessionStateMachine state transitions", () => {
     expect(sm.getState()).toBe("signed-out");
   });
 
-  it("transitions: signed-out → bootstrap-in-flight → token-ready on silent success", async () => {
+  it("transitions: signed-out → acquiring-token-silently → token-ready on silent success", async () => {
     const app = makeMockApp();
     const sm = new ExternalIdSessionStateMachine(app, CLIENT_CONFIG);
 
@@ -45,13 +45,13 @@ describe("ExternalIdSessionStateMachine state transitions", () => {
 
     const result = await sm.acquireTokenReadyState();
 
-    expect(statesDuringAcquire).toContain("bootstrap-in-flight");
+    expect(statesDuringAcquire).toContain("acquiring-token-silently");
     expect(result.state).toBe("token-ready");
     expect(result.accessToken).toBe("access-token-abc");
     expect(sm.getState()).toBe("token-ready");
   });
 
-  it("transitions: bootstrap-in-flight → interaction-required on InteractionRequiredAuthError", async () => {
+  it("transitions: acquiring-token-silently → interaction-required on InteractionRequiredAuthError", async () => {
     const app = makeMockApp({
       acquireTokenSilent: vi.fn(async () => {
         throw new InteractionRequiredAuthError("interaction_required");
@@ -66,7 +66,7 @@ describe("ExternalIdSessionStateMachine state transitions", () => {
     expect(sm.getState()).toBe("interaction-required");
   });
 
-  it("transitions: bootstrap-in-flight → bootstrap-failed on transient error", async () => {
+  it("transitions: acquiring-token-silently → bootstrap-failed on transient error", async () => {
     const app = makeMockApp({
       acquireTokenSilent: vi.fn(async () => {
         throw new Error("transient IDP error");

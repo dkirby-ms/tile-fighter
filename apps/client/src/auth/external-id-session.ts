@@ -46,7 +46,7 @@ export class ExternalIdSessionStateMachine {
       };
     }
 
-    this._state = "bootstrap-in-flight";
+    this._state = "acquiring-token-silently";
 
     const silentRequest: SilentRequest = {
       account,

@@ -224,15 +224,21 @@ jobs:
           set -euo pipefail
 
           ROOM_HOOK_COUNT="$(grep -E "onJoin|onLeave" -c apps/server/src/rooms/arena.room.ts || true)"
-          LIFECYCLE_JOIN_COUNT="$(grep -E "noteRoomJoin|noteRoomLeave" -c apps/server/src/session/session-lifecycle.service.ts || true)"
+          ROOM_LIFECYCLE_CALL_COUNT="$(grep -E "noteRoomJoin|noteRoomLeave" -c apps/server/src/rooms/arena.room.ts || true)"
+          SESSION_ROUTE_MEMBERSHIP_CALL_COUNT="$(grep -E "noteRoomJoin|noteRoomLeave" -c apps/server/src/http/routes/session.routes.ts || true)"
 
           if [[ "$ROOM_HOOK_COUNT" -lt 2 ]]; then
             echo "Expected Colyseus room lifecycle hooks in arena room implementation." >&2
             exit 1
           fi
 
-          if [[ "$LIFECYCLE_JOIN_COUNT" -gt 0 ]]; then
-            echo "Lifecycle service should not own room membership transitions directly." >&2
+          if [[ "$ROOM_LIFECYCLE_CALL_COUNT" -lt 2 ]]; then
+            echo "Expected room membership transitions to be invoked from ArenaRoom hooks." >&2
+            exit 1
+          fi
+
+          if [[ "$SESSION_ROUTE_MEMBERSHIP_CALL_COUNT" -gt 0 ]]; then
+            echo "HTTP session routes should not own room membership transitions." >&2
             exit 1
           fi
 

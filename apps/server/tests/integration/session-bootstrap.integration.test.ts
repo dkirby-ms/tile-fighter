@@ -140,4 +140,52 @@ describe("Session bootstrap integration", () => {
     expect(calls[0][0]).toBe("session_started");
     expect(calls[1][0]).toBe("session_bootstrap_failed");
   });
+
+  it("enforces bootstrap rate limiting per subject and IP", async () => {
+    const authService = {
+      verifyAccessToken: vi.fn(async () => ({
+        subject: "player-1",
+        tenantScopedSubject: "tenant-a|player-1",
+        issuer: "https://tenant.ciamlogin.com/tenant.onmicrosoft.com/v2.0",
+        audience: "api://tile-fighter-server",
+        tenantId: "tenant-a",
+        tokenVersion: "2.0",
+        expiresAt: 1_900_000_000
+      })),
+      issueJoinToken: vi.fn()
+    };
+
+    const telemetrySink = {
+      emit: vi.fn(async () => undefined)
+    } as unknown as TelemetrySink;
+
+    const app = createHttpApp({
+      readinessCheck: async () => ({
+        ok: true,
+        checks: {
+          database: "ok",
+          config: "ok"
+        }
+      }),
+      authMiddleware: buildAuthMiddleware(authService as never),
+      telemetrySink,
+      authService: authService as never,
+      lifecycleService: createLifecycleService(telemetrySink)
+    });
+
+    for (let i = 0; i < 10; i += 1) {
+      const response = await request(app)
+        .get("/api/session/bootstrap")
+        .set("Authorization", "Bearer valid-token");
+
+      expect(response.status).toBe(200);
+    }
+
+    const limitedResponse = await request(app)
+      .get("/api/session/bootstrap")
+      .set("Authorization", "Bearer valid-token");
+
+    expect(limitedResponse.status).toBe(429);
+    expect(limitedResponse.body.error).toBe("Bootstrap rate limit exceeded");
+  });
 });

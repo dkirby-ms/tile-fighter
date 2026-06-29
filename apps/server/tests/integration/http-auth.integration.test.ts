@@ -4,6 +4,7 @@ import { createHttpApp } from "../../src/http/app.js";
 import { buildAuthMiddleware } from "../../src/http/auth-middleware.js";
 import { TelemetrySink } from "../../src/telemetry/telemetry-sink.js";
 import { SessionLifecycleService } from "../../src/session/session-lifecycle.service.js";
+import { ArenaRoom } from "../../src/rooms/arena.room.js";
 
 describe("HTTP auth integration", () => {
   function createLifecycleService(telemetrySink: TelemetrySink): SessionLifecycleService {
@@ -203,11 +204,11 @@ describe("HTTP auth integration", () => {
     const response = await request(app)
       .post("/api/session/join-token")
       .set("Authorization", "Bearer valid-token")
-      .send({ roomId: "arena-1" });
+      .send({ roomId: ArenaRoom.ROOM_KEY });
 
     expect(response.status).toBe(200);
-    expect(response.body.roomId).toBe("arena-1");
+    expect(response.body.roomId).toBe(ArenaRoom.ROOM_KEY);
     expect(response.body.joinToken).toBe("signed-join-token");
-    expect(authService.issueJoinToken).toHaveBeenCalledWith("tenant-a|player-1", "arena-1");
+    expect(authService.issueJoinToken).toHaveBeenCalledWith("tenant-a|player-1", ArenaRoom.ROOM_KEY);
   });
 });

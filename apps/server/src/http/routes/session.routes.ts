@@ -2,6 +2,7 @@ import { Router } from "express";
 import { TelemetrySink } from "../../telemetry/telemetry-sink.js";
 import { AuthService } from "../../auth/auth-service.js";
 import { SessionLifecycleService } from "../../session/session-lifecycle.service.js";
+import { ArenaRoom } from "../../rooms/arena.room.js";
 
 export type SessionRoutesDependencies = {
   telemetrySink: TelemetrySink;
@@ -9,11 +10,59 @@ export type SessionRoutesDependencies = {
   lifecycleService: SessionLifecycleService;
 };
 
+type RateWindow = {
+  windowStartedAtMs: number;
+  count: number;
+};
+
+const BOOTSTRAP_RATE_LIMIT_WINDOW_MS = 60_000;
+const BOOTSTRAP_RATE_LIMIT_MAX = 10;
+const HEARTBEAT_RATE_LIMIT_WINDOW_MS = 10_000;
+const HEARTBEAT_RATE_LIMIT_MAX = 30;
+
+function isRateLimited(
+  windows: Map<string, RateWindow>,
+  key: string,
+  nowMs: number,
+  windowMs: number,
+  maxInWindow: number
+): boolean {
+  const current = windows.get(key);
+
+  if (!current || nowMs - current.windowStartedAtMs >= windowMs) {
+    windows.set(key, {
+      windowStartedAtMs: nowMs,
+      count: 1
+    });
+    return false;
+  }
+
+  current.count += 1;
+  windows.set(key, current);
+  return current.count > maxInWindow;
+}
+
 export function createSessionRoutes(dependencies: SessionRoutesDependencies): Router {
   const router = Router();
+  const bootstrapWindowsBySubjectIp = new Map<string, RateWindow>();
+  const heartbeatWindowsBySubject = new Map<string, RateWindow>();
 
-  router.get("/api/session/bootstrap", async (_req, res) => {
+  router.get("/api/session/bootstrap", async (req, res) => {
     const principal = res.locals.principal;
+    const subjectIpKey = `${principal.tenantScopedSubject}|${req.ip ?? "unknown"}`;
+
+    if (
+      isRateLimited(
+        bootstrapWindowsBySubjectIp,
+        subjectIpKey,
+        Date.now(),
+        BOOTSTRAP_RATE_LIMIT_WINDOW_MS,
+        BOOTSTRAP_RATE_LIMIT_MAX
+      )
+    ) {
+      res.status(429).json({ error: "Bootstrap rate limit exceeded" });
+      return;
+    }
 
     try {
       await dependencies.telemetrySink.emit("session_started", {
@@ -58,8 +107,16 @@ export function createSessionRoutes(dependencies: SessionRoutesDependencies): Ro
       return;
     }
 
+    if (roomId !== ArenaRoom.ROOM_KEY) {
+      res.status(400).json({ error: `Unsupported roomId: ${roomId}` });
+      return;
+    }
+
     try {
-      const joinToken = dependencies.authService.issueJoinToken(principal.tenantScopedSubject, roomId);
+      const joinToken = dependencies.authService.issueJoinToken(
+        principal.tenantScopedSubject,
+        ArenaRoom.ROOM_KEY
+      );
 
       await dependencies.telemetrySink.emit("room_join_token_issued", {
         tenantScopedSubject: principal.tenantScopedSubject,
@@ -85,6 +142,19 @@ export function createSessionRoutes(dependencies: SessionRoutesDependencies): Ro
 
     if (!roomId) {
       res.status(400).json({ error: "roomId is required" });
+      return;
+    }
+
+    if (
+      isRateLimited(
+        heartbeatWindowsBySubject,
+        principal.tenantScopedSubject,
+        Date.now(),
+        HEARTBEAT_RATE_LIMIT_WINDOW_MS,
+        HEARTBEAT_RATE_LIMIT_MAX
+      )
+    ) {
+      res.status(429).json({ error: "Heartbeat rate limit exceeded" });
       return;
     }
 
