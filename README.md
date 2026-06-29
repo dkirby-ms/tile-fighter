@@ -76,15 +76,38 @@ Deployment and release policy details are documented in [docs/cicd-harness.md](d
 
 ## Tests
 
-```bash
-npm run -w @game/server test
-npm run -w @game/server test:load
-```
+All integration tests **require** `TEST_DATABASE_URL` to be set. This is enforced in both local development and CI to ensure consistent test coverage.
 
-Integration database policy baseline for Epic 2 follow-up:
+### Running Tests Locally
 
-- Local development may skip DB-dependent integration suites when DB prerequisites are unavailable.
-- CI defaults to strict DB precondition enforcement for required integration suites unless an explicit skip mode is documented and approved.
+1. **Start PostgreSQL**:
+   ```bash
+   docker compose up -d postgres
+   ```
+
+2. **Set TEST_DATABASE_URL** before running tests:
+   ```bash
+   export TEST_DATABASE_URL="postgresql://postgres:postgres@localhost:5432/tile_fighter_test"
+   npm run -w @game/server test
+   ```
+   
+   Or inline:
+   ```bash
+   TEST_DATABASE_URL="postgresql://postgres:postgres@localhost:5432/tile_fighter_test" npm run -w @game/server test
+   ```
+
+3. **Load Testing** (optional, requires DB):
+   ```bash
+   TEST_DATABASE_URL="postgresql://postgres:postgres@localhost:5432/tile_fighter_test" npm run -w @game/server test:load
+   ```
+
+### Integration Test Database Policy
+
+- **Local development**: `TEST_DATABASE_URL` is required; process exits if not set
+- **CI**: `TEST_DATABASE_URL` must be configured in environment or GitHub secrets
+- **Rationale**: Prevents silent test skips that could hide missing database setup; ensures consistent coverage across environments
+
+If you see "TEST_DATABASE_URL environment variable is required" error, follow the setup steps above to configure your PostgreSQL instance.
 
 ## Container Build and Run
 

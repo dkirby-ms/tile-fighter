@@ -86,7 +86,7 @@ describe("Region snapshot replay integration", () => {
   }
 
   it("creates a snapshot for authenticated caller", async () => {
-    const { app, regionSnapshotService } = createApp();
+    const { app, regionSnapshotService } = createApp({ roles: ["operator"] });
 
     const response = await request(app)
       .post("/api/admin/snapshots/create")
@@ -106,7 +106,7 @@ describe("Region snapshot replay integration", () => {
   });
 
   it("requires regionId when creating a snapshot", async () => {
-    const { app } = createApp();
+    const { app } = createApp({ roles: ["operator"] });
 
     const response = await request(app)
       .post("/api/admin/snapshots/create")
@@ -243,12 +243,15 @@ describe("Region snapshot replay lifecycle integration (db-backed)", () => {
     db: DatabaseRuntime["db"],
     regionId: string
   ): Promise<string> {
+    // CRITICAL: Must match createSnapshot sort order for consistent hash.
+    // Sort by (cell_x, cell_y, id) to ensure deterministic ordering.
     const rows = await db
       .selectFrom("tiles")
       .selectAll()
       .where("region_id", "=", regionId)
       .orderBy("cell_x", "asc")
       .orderBy("cell_y", "asc")
+      .orderBy("id", "asc")  // Secondary sort to guarantee determinism
       .execute();
 
     return computeRegionHash(
@@ -427,5 +430,101 @@ describe("Region snapshot replay lifecycle integration (db-backed)", () => {
         .execute();
       expect(unrelatedRows).toHaveLength(1);
       expect(unrelatedRows[0]?.color).toBe("yellow");
+    });
+
+    it("detects hash mismatch when region state diverges after snapshot creation", async () => {
+      if (!testsCanRun || !runtime || !service) {
+        return;
+      }
+
+      const regionId = `region-hash-mismatch-${Date.now()}`;
+      const actorId = "actor-test";
+      const db = runtime.db;
+
+      try {
+        await db
+          .insertInto("tiles")
+          .values({
+            region_id: regionId,
+            cell_x: 0,
+            cell_y: 0,
+            offset_x: 0,
+            offset_y: 0,
+            shape: "square",
+            color: "red",
+            style_payload: {},
+            owner_id: "owner-a"
+          })
+          .execute();
+
+        const snapshot1 = await service.createSnapshot({
+          regionId,
+          actorId
+        });
+
+        const hash1 = await computeHashForRegion(db, regionId);
+        expect(hash1).toBe(snapshot1.expectedHash);
+
+        await db
+          .insertInto("tiles")
+          .values({
+            region_id: regionId,
+            cell_x: 1,
+            cell_y: 1,
+            offset_x: 0.1,
+            offset_y: 0.1,
+            shape: "circle",
+            color: "blue",
+            style_payload: {},
+            owner_id: "owner-b"
+          })
+          .execute();
+
+        const hash2 = await computeHashForRegion(db, regionId);
+        expect(hash2).not.toBe(snapshot1.expectedHash);
+        expect(hash2).not.toBe(hash1);
+
+        await expect(
+          service.restoreLatest({
+            regionId,
+            actorId
+          })
+        ).rejects.toThrow(RegionSnapshotHashMismatchError);
+
+        try {
+          await service.restoreLatest({
+            regionId,
+            actorId
+          });
+          throw new Error("Expected RegionSnapshotHashMismatchError to be thrown");
+        } catch (error) {
+          if (error instanceof RegionSnapshotHashMismatchError) {
+            expect(error.message).toContain("expected");
+            expect(error.message).toContain("got");
+          } else {
+            throw error;
+          }
+        }
+      } finally {
+        await db
+          .deleteFrom("tiles")
+          .where("region_id", "=", regionId)
+          .execute();
+
+        await db
+          .deleteFrom("region_snapshot_tiles")
+          .where("snapshot_id", "in", (eb) =>
+            eb
+              .selectFrom("region_snapshots")
+              .select("snapshot_id")
+              .where("region_id", "=", regionId)
+          )
+          .execute();
+
+        await db
+          .deleteFrom("region_snapshots")
+          .where("region_id", "=", regionId)
+          .execute();
+      }
     });
 });

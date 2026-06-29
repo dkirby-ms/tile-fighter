@@ -81,7 +81,8 @@ async function bootstrap(): Promise<void> {
     regionDiffService,
     tilePlaceThrottlePolicy: {
       maxRequests: runtimeConfig.tilePlaceThrottleMaxRequests,
-      windowMs: runtimeConfig.tilePlaceThrottleWindowMs
+      windowMs: runtimeConfig.tilePlaceThrottleWindowMs,
+      ttlMs: runtimeConfig.tilePlaceThrottleTtlMs
     },
     regionDiffLimits: {
       defaultMaxTiles: runtimeConfig.regionDiffDefaultMaxTiles,

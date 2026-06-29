@@ -58,6 +58,22 @@ export interface TilePlaceCommand {
   stylePayload: unknown;
 }
 
+/**
+ * Discriminated union result for tile placement operations.
+ *
+ * **Error Handling Philosophy**:
+ * Only includes domain-specific failure variants (occupied, throttled).
+ * Unexpected errors (database failures, validation errors, etc.) are
+ * handled at the route layer and returned as HTTP 500 errors, not
+ * mapped to this union. This keeps the type contract focused on
+ * recoverable domain failures that clients should handle differently.
+ *
+ * The route layer is responsible for catching and safely handling
+ * any unmapped errors before they reach the client.
+ *
+ * **Serialization**:
+ * createdAt is an ISO 8601 string (result of .toISOString()).
+ */
 export type TilePlaceResult =
   | {
       ok: true;
@@ -83,6 +99,22 @@ export interface TileEditCommand {
   stylePayload: unknown;
 }
 
+/**
+ * Discriminated union result for tile edit operations.
+ *
+ * **Error Handling Philosophy**:
+ * Only includes domain-specific failure variants (forbidden_owner_mismatch, edit_window_expired).
+ * Unexpected errors (database failures, serialization errors, etc.) are
+ * handled at the route layer and returned as HTTP 500 errors, not
+ * mapped to this union. This keeps the type contract focused on
+ * recoverable domain failures that clients should handle differently.
+ *
+ * The route layer is responsible for catching and safely handling
+ * any unmapped errors before they reach the client.
+ *
+ * **Serialization**:
+ * editedAt is an ISO 8601 string (result of .toISOString()).
+ */
 export type TileEditResult =
   | {
       ok: true;
@@ -130,7 +162,7 @@ export const DEFAULT_REGION_DIFF_POLICY: RegionDiffPolicyMetadata = {
     maxTilesPerRequest: 1_000,
     defaultMaxTiles: 500
   },
-  deleteSemantics: "explicit_delete_ops",
+  deleteSemantics: "upsert_only",
   requiresRegionMembership: true
 };
 

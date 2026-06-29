@@ -62,6 +62,19 @@ function mapDelta(delta: TileDeltasSelect): RegionDiffTileDelta {
   };
 }
 
+/**
+ * Compacts deltas to latest version per coordinate, filtering out delete operations.
+ *
+ * DELETE SEMANTICS (Latest-Wins, Deletes Filtered):
+ * - For each coordinate (cellX, cellY), keeps only the latest delta
+ * - If the latest delta is a delete operation, the entire coordinate is OMITTED from result
+ * - Rationale: Diffs represent "live state" not "all history"
+ *   (a) Cleaner for clients: no null fields to interpret
+ *   (b) More intuitive: client sees exactly what exists now
+ *   (c) Prevents "never placed" vs "deleted" ambiguity
+ * - Stale clients see only live tiles; deletes are implicit (absence = deleted or never existed)
+ * - If client needs explicit delete notification, that's a separate concern (e.g., tombstone tracking)
+ */
 function compactLatestByCoordinate(deltas: TileDeltasSelect[]): RegionDiffTileDelta[] {
   const latestByCoordinate = new Map<string, RegionDiffTileDelta>();
 
@@ -70,21 +83,24 @@ function compactLatestByCoordinate(deltas: TileDeltasSelect[]): RegionDiffTileDe
     latestByCoordinate.set(key, mapDelta(delta));
   }
 
-  return Array.from(latestByCoordinate.values()).sort((left, right) => {
-    if (left.version !== right.version) {
-      return left.version - right.version;
-    }
+  // Filter out delete operations: only return live tiles
+  return Array.from(latestByCoordinate.values())
+    .filter((delta) => delta.operation !== "delete")
+    .sort((left, right) => {
+      if (left.version !== right.version) {
+        return left.version - right.version;
+      }
 
-    if (left.cellX !== right.cellX) {
-      return left.cellX - right.cellX;
-    }
+      if (left.cellX !== right.cellX) {
+        return left.cellX - right.cellX;
+      }
 
-    if (left.cellY !== right.cellY) {
-      return left.cellY - right.cellY;
-    }
+      if (left.cellY !== right.cellY) {
+        return left.cellY - right.cellY;
+      }
 
-    return left.operation.localeCompare(right.operation);
-  });
+      return left.operation.localeCompare(right.operation);
+    });
 }
 
 export class RegionDiffService {

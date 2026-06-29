@@ -35,7 +35,9 @@ describe("RegionSnapshotService", () => {
           where: vi.fn().mockReturnValue({
             orderBy: vi.fn().mockReturnValue({
               orderBy: vi.fn().mockReturnValue({
-                execute: vi.fn().mockResolvedValue(tiles)
+                orderBy: vi.fn().mockReturnValue({
+                  execute: vi.fn().mockResolvedValue(tiles)
+                })
               })
             })
           })

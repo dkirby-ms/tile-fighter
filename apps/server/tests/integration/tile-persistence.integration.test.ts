@@ -507,6 +507,53 @@ describe("Tile persistence integration", () => {
     expect(unchanged?.color).toBe("red");
   });
 
+  it.skipIf(!testsCanRun || !db)("should reject edit when server clock skews backward (edge case)", async () => {
+    const regionId = "test-clock-skew";
+
+    const inserted = await repository.insertTile(db, {
+      regionId,
+      cellX: 10,
+      cellY: 10,
+      offsetX: 0,
+      offsetY: 0,
+      shape: "circle",
+      color: "blue",
+      stylePayload: {},
+      ownerId: "owner-skew"
+    });
+
+    expect(inserted.ok).toBe(true);
+
+    const existing = await repository.selectTileByCoordinate(db, regionId, 10, 10);
+    expect(existing).not.toBeNull();
+
+    // Simulate server clock jumping backward by 5 minutes (very rare, but possible during clock correction)
+    const clockSkewedNow = new Date(existing!.created_at.getTime() - 5 * 60 * 1000);
+
+    const editResult = await repository.editTileWithinSelfEditWindow(db, {
+      regionId,
+      cellX: 10,
+      cellY: 10,
+      shape: "triangle",
+      color: "green",
+      stylePayload: { edit: "skewed" },
+      ownerId: "owner-skew",
+      now: clockSkewedNow,
+      selfEditWindowMs: 10 * 60 * 1000
+    });
+
+    // Edge case: edit fails because windowStart is now much earlier than created_at
+    // This is the safe behavior—we reject rather than allow potentially invalid edits
+    expect(editResult).toEqual({
+      ok: false,
+      reason: "edit_window_expired"
+    });
+
+    const unchanged = await repository.selectTileByCoordinate(db, regionId, 10, 10);
+    expect(unchanged?.shape).toBe("circle");
+    expect(unchanged?.color).toBe("blue");
+  });
+
   it.skipIf(!testsCanRun || !db)("should enforce placement throttle and recover after window", async () => {
     const { app, telemetrySink } = createAppWithThrottle(2, 120);
 

@@ -219,7 +219,23 @@ export class TileRepository implements ITileRepository {
 
   /**
    * Edit a tile only when owner matches and created_at is within self-edit window.
-   * created_at remains the policy anchor and is never updated.
+   *
+   * FIXED WINDOW DESIGN (NOT SLIDING):
+   * - created_at is immutable and serves as the policy anchor
+   * - Edit window is [created_at, created_at + selfEditWindowMs)
+   * - The window is NOT reset on each edit (not sliding)
+   * - This ensures deterministic audit trail: a tile placed at T0 can always be edited until T0+10min
+   * - Design rationale: (a) Predictable UX for players; (b) Audit-friendly (no hidden state);
+   *   (c) Prevents accidental greedy re-editing windows
+   *
+   * CLOCK SKEW EDGE CASE:
+   * - If server clock jumps backward (correction, deployment race), `input.now` may be before
+   *   an existing tile's `created_at`. The WHERE clause "created_at >= windowStart" will
+   *   fail to match even if the tile was just created.
+   * - Behavior: Returns forbidden_edit_window_expired (client sees "window expired")
+   * - Recovery: Operator must resolve clock drift before tiles can be edited again
+   * - Note: This is acceptable because clock skew is rare and immediate recovery is problematic;
+   *   we err on the side of blocking rather than allowing potentially invalid edits
    */
   async editTileWithinSelfEditWindow(
     db: Kysely<ServerDatabase>,

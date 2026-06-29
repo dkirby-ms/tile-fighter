@@ -29,6 +29,7 @@ export type HttpAppDependencies = {
   tilePlaceThrottlePolicy?: {
     maxRequests: number;
     windowMs: number;
+    ttlMs?: number;
   };
   regionDiffLimits?: {
     defaultMaxTiles: number;
@@ -43,14 +44,53 @@ export function createHttpApp(dependencies: HttpAppDependencies) {
 
   const tilePlaceThrottlePolicy = dependencies.tilePlaceThrottlePolicy ?? {
     maxRequests: 5,
-    windowMs: 60_000
+    windowMs: 60_000,
+    ttlMs: 24 * 60 * 60 * 1000
   };
   const regionDiffLimits = dependencies.regionDiffLimits ?? {
     defaultMaxTiles: DEFAULT_REGION_DIFF_POLICY.limits.defaultMaxTiles,
     maxTilesPerRequest: DEFAULT_REGION_DIFF_POLICY.limits.maxTilesPerRequest,
     maxViewportArea: DEFAULT_REGION_DIFF_POLICY.limits.maxViewportArea
   };
-  const tilePlacementThrottleByKey = new Map<string, number[]>();
+
+  /**
+   * Tile placement throttle map with TTL-based cleanup.
+   *
+   * **Structure**: Map<key, { lastActivityMs, attempts }>
+   * - key: `${tenantScopedSubject}:${regionId}` (account + region scoped)
+   * - lastActivityMs: timestamp of most recent placement attempt
+   * - attempts: array of attempt timestamps within current window
+   *
+   * **Cleanup Strategy**:
+   * 1. **Lazy Cleanup** (lines ~125-128): After filtering old attempts within sliding window,
+   *    if no recent attempts remain, the key is lazily deleted.
+   * 2. **Periodic Cleanup** (lines ~134-142): Every hour, scan all keys and remove entries
+   *    where lastActivityMs is older than TTL (default 24h). This prevents unbounded
+   *    map growth on long-lived servers.
+   *
+   * **Memory Impact**: O(accounts × regions) map entries. With 1k accounts × 10 regions,
+   * ~10k entries × ~100 bytes ≈ 1MB. Periodic cleanup keeps this bounded over time.
+   */
+  type ThrottleEntry = { lastActivityMs: number; attempts: number[] };
+  const tilePlacementThrottleByKey = new Map<string, ThrottleEntry>();
+  const tilePlaceThrottleTtlMs = tilePlaceThrottlePolicy.ttlMs ?? 24 * 60 * 60 * 1000;
+
+  // Periodic cleanup: every hour, remove entries older than TTL
+  const cleanupIntervalMs = 60 * 60 * 1000; // 1 hour
+  const cleanupInterval = setInterval(() => {
+    const now = Date.now();
+    let cleanedCount = 0;
+    for (const [key, entry] of tilePlacementThrottleByKey) {
+      if (now - entry.lastActivityMs > tilePlaceThrottleTtlMs) {
+        tilePlacementThrottleByKey.delete(key);
+        cleanedCount++;
+      }
+    }
+    // Optionally log: console.debug(`[TilePlacement] Throttle cleanup: removed ${cleanedCount} stale entries`);
+  }, cleanupIntervalMs);
+
+  // Clean up interval on graceful shutdown
+  (app as any)._throttleCleanupInterval = cleanupInterval;
 
   app.use(express.json());
   app.use(createHealthRoutes(dependencies.readinessCheck));
@@ -118,12 +158,18 @@ export function createHttpApp(dependencies: HttpAppDependencies) {
           };
         },
         shouldThrottleTilePlace: async ({ key, nowMs, regionId, cellX, cellY, ownerId }) => {
+          // Get or create throttle entry for this key
+          const entry: ThrottleEntry = tilePlacementThrottleByKey.get(key) ?? {
+            lastActivityMs: nowMs,
+            attempts: []
+          };
+
+          // Filter attempts within current sliding window
           const cutoff = nowMs - tilePlaceThrottlePolicy.windowMs;
-          const recentAttempts = (tilePlacementThrottleByKey.get(key) ?? []).filter(
-            (attemptedAtMs) => attemptedAtMs > cutoff
-          );
+          const recentAttempts = entry.attempts.filter((attemptedAtMs) => attemptedAtMs > cutoff);
 
           if (recentAttempts.length >= tilePlaceThrottlePolicy.maxRequests) {
+            // Throttle limit exceeded: calculate retry-after and emit telemetry
             const oldestAttemptInWindow = recentAttempts[0] ?? nowMs;
             const retryAfterMs = Math.max(1, tilePlaceThrottlePolicy.windowMs - (nowMs - oldestAttemptInWindow));
             await dependencies.telemetrySink.emitTilePlaceThrottled(
@@ -141,8 +187,17 @@ export function createHttpApp(dependencies: HttpAppDependencies) {
             };
           }
 
+          // Record this attempt and update entry
           recentAttempts.push(nowMs);
-          tilePlacementThrottleByKey.set(key, recentAttempts);
+          entry.lastActivityMs = nowMs;
+          entry.attempts = recentAttempts;
+          tilePlacementThrottleByKey.set(key, entry);
+
+          // Lazy cleanup: if no recent attempts remain, delete the key
+          if (recentAttempts.length === 0) {
+            tilePlacementThrottleByKey.delete(key);
+          }
+
           return {
             throttled: false,
             retryAfterMs: 0

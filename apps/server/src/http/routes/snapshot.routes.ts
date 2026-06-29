@@ -62,6 +62,13 @@ export function createSnapshotRoutes(dependencies: SnapshotRoutesDependencies): 
       return;
     }
 
+    // CRITICAL: Operator authorization required to create snapshots.
+    // Prevents non-authorized principals from triggering expensive snapshot operations.
+    if (principal.authorization?.isOperator !== true) {
+      res.status(403).json({ error: "Forbidden" });
+      return;
+    }
+
     const regionId = parseRegionId(req.body);
     if (!regionId) {
       res.status(400).json({ error: "regionId is required" });

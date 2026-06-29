@@ -55,6 +55,20 @@ function isRegionDiffOperation(value: string): value is RegionDiffOperation {
   return value === "upsert" || value === "delete";
 }
 
+/**
+ * Validates and parses a region diff request, enforcing bounds before service invocation.
+ *
+ * Validation ensures:
+ * - regionId is non-empty string
+ * - sinceVersion is non-negative integer (0+ for paginated queries)
+ * - viewport coordinates are integers with min ≤ max, and both ≥ 0
+ * - viewport area ≤ maxViewportArea (default 10,000 cells)
+ * - maxTiles is positive integer ≤ maxTilesPerRequest cap
+ *
+ * Returns null if any validation fails; route will return 400 Bad Request.
+ * This early validation prevents malformed requests from reaching the service layer,
+ * providing clear bounds guarantees for pagination and query optimization.
+ */
 function parseRegionDiffRequest(
   body: unknown,
   limits: RegionDiffRoutesDependencies["limits"]
@@ -77,6 +91,7 @@ function parseRegionDiffRequest(
   }
 
   const viewport = value.viewport;
+  // Validate viewport coordinates are integers
   if (
     !isInteger(viewport.minCellX) ||
     !isInteger(viewport.maxCellX) ||
@@ -86,7 +101,11 @@ function parseRegionDiffRequest(
     return null;
   }
 
+  // Validate coordinate bounds: min ≤ max and non-negative (cells are indexed 0+)
   if (viewport.minCellX > viewport.maxCellX || viewport.minCellY > viewport.maxCellY) {
+    return null;
+  }
+  if (viewport.minCellX < 0 || viewport.minCellY < 0) {
     return null;
   }
 

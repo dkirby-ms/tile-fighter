@@ -152,6 +152,9 @@ export function createTileRoutes(dependencies: TileRoutesDependencies): Router {
       ownerId: principal.tenantScopedSubject
     });
 
+    // All domain-specific failures (occupied, throttled) are mapped below.
+    // Unexpected errors (db, validation) are not caught here and will become 500s,
+    // per TilePlaceResult error handling philosophy: route layer owns unmapped errors.
     if (!result.ok) {
       if (result.reason === "throttled") {
         const rejected: TilePlaceResult = {
@@ -203,6 +206,9 @@ export function createTileRoutes(dependencies: TileRoutesDependencies): Router {
       selfEditWindowMs: SELF_EDIT_WINDOW_MS
     });
 
+    // All domain-specific failures (owner/window) are mapped below.
+    // Unexpected errors (db, serialization) are not caught here and will become 500s,
+    // per TileEditResult error handling philosophy: route layer owns unmapped errors.
     if (!result.ok) {
       const rejected: TileEditResult = {
         ok: false,

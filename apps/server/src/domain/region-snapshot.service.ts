@@ -76,12 +76,17 @@ export class RegionSnapshotService {
   }
 
   async createSnapshot(input: CreateSnapshotInput): Promise<CreateSnapshotResult> {
+    // CRITICAL: Fetch tiles with deterministic sort order to ensure consistent hash.
+    // Sort by (cell_x, cell_y, id) to guarantee absolute ordering even if multiple
+    // tiles theoretically had the same coordinate (prevented by DB constraint, but
+    // explicit tiebreaker ensures canonical sort across all restore operations).
     const regionTiles = await this.dependencies.db
       .selectFrom("tiles")
       .selectAll()
       .where("region_id", "=", input.regionId)
       .orderBy("cell_x", "asc")
       .orderBy("cell_y", "asc")
+      .orderBy("id", "asc")  // Secondary sort: ensures absolute determinism
       .execute();
 
     const snapshotTiles = regionTiles.map((tile) => mapTileRow(tile));
@@ -146,12 +151,22 @@ export class RegionSnapshotService {
       durationMs
     );
 
+    // CRITICAL: Verify hash integrity before committing restore.
+    // Hash mismatch indicates data corruption or version mismatch.
+    // Log both hashes for production debugging before throwing.
     if (actualHash !== latestSnapshot.snapshot.expected_hash) {
-      throw new RegionSnapshotHashMismatchError(
+      const mismatchError = new RegionSnapshotHashMismatchError(
         latestSnapshot.snapshot.snapshot_id,
         latestSnapshot.snapshot.expected_hash,
         actualHash
       );
+      
+      // Log mismatch details for debugging (includes both hash values in error message)
+      console.error(
+        `[RegionSnapshotService] Hash mismatch during restore: ${mismatchError.message} (restoredTileCount=${restoredTiles.length}, durationMs=${durationMs})`
+      );
+      
+      throw mismatchError;
     }
 
     return {

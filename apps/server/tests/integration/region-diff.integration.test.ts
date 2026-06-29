@@ -214,6 +214,27 @@ describe("Region diff integration", () => {
     expect(response.body).toEqual({ error: "Invalid region diff request" });
   });
 
+  it.skipIf(!testsCanRun || !db)("returns 400 for negative viewport coordinates", async () => {
+    const app = createApp();
+
+    const response = await request(app)
+      .post("/api/regions/diff")
+      .set("Authorization", "Bearer valid-token")
+      .send({
+        regionId: "region-diff-a",
+        sinceVersion: 0,
+        viewport: {
+          minCellX: -5,
+          maxCellX: 4,
+          minCellY: 0,
+          maxCellY: 4
+        }
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({ error: "Invalid region diff request" });
+  });
+
   it.skipIf(!testsCanRun || !db)("returns empty diff when client is unchanged", async () => {
     const app = createApp();
 
@@ -315,7 +336,7 @@ describe("Region diff integration", () => {
           maxTilesPerRequest: 3,
           maxViewportArea: 25
         },
-        deleteSemantics: "explicit_delete_ops",
+        deleteSemantics: "upsert_only",
         requiresRegionMembership: true
       }
     });
@@ -364,7 +385,7 @@ describe("Region diff integration", () => {
     expect(response.body).toEqual({ error: "Invalid region diff request" });
   });
 
-  it.skipIf(!testsCanRun || !db)("returns delete operation for stale client after tile removal", async () => {
+  it.skipIf(!testsCanRun || !db)("filters out delete operations from diff result (latest-wins, deletes implicit)", async () => {
     const app = createApp();
 
     await placeTile({ cellX: 6, cellY: 6, color: "red" });
@@ -386,17 +407,47 @@ describe("Region diff integration", () => {
       });
 
     expect(response.status).toBe(200);
-    expect(response.body.tiles).toEqual([
+    // Delete operations are filtered out; client sees empty result (no tile at 6,6)
+    // Absence of tile = deleted or never placed (implicit deletion semantics)
+    expect(response.body.tiles).toEqual([]);
+    expect(response.body.isEmpty).toBe(true);
+  });
+
+  it.skipIf(!testsCanRun || !db)("includes live tiles and excludes deleted tiles in same diff", async () => {
+    const app = createApp();
+
+    // Place two tiles
+    await placeTile({ cellX: 1, cellY: 1, color: "red" });
+    await placeTile({ cellX: 2, cellY: 2, color: "blue" });
+
+    // Delete the first tile
+    await deleteTile({ cellX: 1, cellY: 1 });
+
+    const response = await request(app)
+      .post("/api/regions/diff")
+      .set("Authorization", "Bearer valid-token")
+      .send({
+        regionId: "region-diff-a",
+        sinceVersion: 0,
+        viewport: {
+          minCellX: 0,
+          maxCellX: 10,
+          minCellY: 0,
+          maxCellY: 10
+        },
+        maxTiles: 100
+      });
+
+    expect(response.status).toBe(200);
+    // Only the live tile (2,2) is returned; deleted tile (1,1) is filtered out
+    expect(response.body.tiles).toHaveLength(1);
+    expect(response.body.tiles[0]).toEqual(
       expect.objectContaining({
-        cellX: 6,
-        cellY: 6,
-        operation: "delete",
-        offsetX: null,
-        offsetY: null,
-        shape: null,
-        color: null,
-        ownerId: null
+        cellX: 2,
+        cellY: 2,
+        operation: "upsert",
+        color: "blue"
       })
-    ]);
+    );
   });
 });

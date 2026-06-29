@@ -40,9 +40,20 @@ function normalizeJsonValue(value: unknown): JsonLike {
   return String(value);
 }
 
+/**
+ * Compute deterministic SHA256 hash of region tiles for integrity verification.
+ * 
+ * CRITICAL: The sort order MUST be stable and canonical across all environments.
+ * Tiles are sorted by: cellX → cellY → offsetX → offsetY → shape → color → ownerId.
+ * This ensures that two regions with identical tile state will always produce the same hash,
+ * which is essential for snapshot restore verification and data integrity detection.
+ * 
+ * Any changes to this sort order will invalidate existing snapshots, so update carefully.
+ */
 export function computeRegionHash(rows: RegionHashTileRow[]): string {
   const normalized = [...rows]
     .sort((left, right) => {
+      // Primary sort: spatial coordinates (cellX, then cellY)
       if (left.cellX !== right.cellX) {
         return left.cellX - right.cellX;
       }
@@ -51,6 +62,7 @@ export function computeRegionHash(rows: RegionHashTileRow[]): string {
         return left.cellY - right.cellY;
       }
 
+      // Secondary sort: visual properties (offsets, shape, color)
       if (left.offsetX !== right.offsetX) {
         return left.offsetX - right.offsetX;
       }
@@ -67,6 +79,7 @@ export function computeRegionHash(rows: RegionHashTileRow[]): string {
         return left.color.localeCompare(right.color);
       }
 
+      // Final sort: owner identity (ensures deterministic order even for identical visuals)
       return left.ownerId.localeCompare(right.ownerId);
     })
     .map((row) => ({

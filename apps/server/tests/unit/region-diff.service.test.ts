@@ -165,7 +165,7 @@ describe("RegionDiffService", () => {
     expect(result.nextSinceVersion).toBe(5);
   });
 
-  it("returns delete delta when latest operation for a coordinate is delete", async () => {
+  it("filters out delete delta when latest operation for a coordinate is delete", async () => {
     const { service } = createService({
       currentVersion: 4,
       deltas: [
@@ -194,17 +194,8 @@ describe("RegionDiffService", () => {
       maxTiles: 100
     });
 
-    expect(result.tiles).toHaveLength(1);
-    expect(result.tiles[0]).toEqual(
-      expect.objectContaining({
-        cellX: 7,
-        cellY: 3,
-        version: 4,
-        operation: "delete",
-        shape: null,
-        color: null
-      })
-    );
+    expect(result.tiles).toEqual([]);
+    expect(result.isEmpty).toBe(true);
     expect(result.nextSinceVersion).toBe(4);
   });
 

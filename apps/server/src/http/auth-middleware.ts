@@ -53,18 +53,44 @@ function resolveOperatorAuthorization(
   const source: OperatorClaimSource = contract.source;
 
   if (source === "roles") {
-    return hasOperatorRole(principal, contract);
+    const isOperator = hasOperatorRole(principal, contract);
+    if (isOperator) {
+      // Audit logging: operator authorization via roles
+      // Can be used to track operator action patterns across identity systems
+      console.debug("[AuthMiddleware] Operator auth resolved via roles");
+    } else {
+      console.debug("[AuthMiddleware] Operator auth NOT resolved via roles");
+    }
+    return isOperator;
   }
 
   if (source === "scopes") {
-    return hasOperatorScope(principal, contract);
+    const isOperator = hasOperatorScope(principal, contract);
+    if (isOperator) {
+      // Audit logging: operator authorization via scopes
+      console.debug("[AuthMiddleware] Operator auth resolved via scopes");
+    } else {
+      console.debug("[AuthMiddleware] Operator auth NOT resolved via scopes");
+    }
+    return isOperator;
   }
 
-  if (hasOperatorRole(principal, contract)) {
+  // Defense-in-depth: fallback to roles first, then scopes
+  // This allows flexibility across identity system configurations
+  const viaRoles = hasOperatorRole(principal, contract);
+  if (viaRoles) {
+    console.debug("[AuthMiddleware] Operator auth resolved via roles (fallback)");
     return true;
   }
 
-  return hasOperatorScope(principal, contract);
+  const viaScopes = hasOperatorScope(principal, contract);
+  if (viaScopes) {
+    console.debug("[AuthMiddleware] Operator auth resolved via scopes (fallback)");
+    return true;
+  }
+
+  console.debug("[AuthMiddleware] Operator auth NOT resolved (no matching roles, no matching scopes)");
+  return false;
 }
 
 function withAuthorizationFlag<T extends object>(
