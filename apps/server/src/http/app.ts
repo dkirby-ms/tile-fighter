@@ -4,12 +4,14 @@ import { createHealthRoutes } from "./routes/health.routes.js";
 import { createProtectedRoutes } from "./routes/protected.routes.js";
 import { createSessionRoutes } from "./routes/session.routes.js";
 import { createTileRoutes } from "./routes/tile.routes.js";
+import { createSnapshotRoutes } from "./routes/snapshot.routes.js";
 import { TelemetrySink } from "../telemetry/telemetry-sink.js";
 import { AuthService } from "../auth/auth-service.js";
 import { SessionLifecycleService } from "../session/session-lifecycle.service.js";
 import { Kysely } from "kysely";
 import { ServerDatabase } from "../persistence/db.js";
 import { ITileRepository } from "../persistence/tile.repository.js";
+import { RegionSnapshotService } from "../domain/region-snapshot.service.js";
 
 export type HttpAppDependencies = {
   readinessCheck: () => Promise<ReadinessReport>;
@@ -19,6 +21,7 @@ export type HttpAppDependencies = {
   lifecycleService: SessionLifecycleService;
   db?: Kysely<ServerDatabase>;
   tileRepository?: ITileRepository;
+  regionSnapshotService?: RegionSnapshotService;
 };
 
 export function createHttpApp(dependencies: HttpAppDependencies) {
@@ -29,6 +32,13 @@ export function createHttpApp(dependencies: HttpAppDependencies) {
   app.use(createHealthRoutes(dependencies.readinessCheck));
   app.use(dependencies.authMiddleware);
   app.use(createProtectedRoutes());
+  if (dependencies.regionSnapshotService) {
+    app.use(
+      createSnapshotRoutes({
+        snapshotService: dependencies.regionSnapshotService
+      })
+    );
+  }
   if (dependencies.db && dependencies.tileRepository) {
     app.use(
       createTileRoutes({

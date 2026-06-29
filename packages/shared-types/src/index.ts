@@ -1,5 +1,9 @@
 export type TenantMode = "single" | "multi" | "both";
 
+export interface PrincipalAuthorization {
+  isOperator: boolean;
+}
+
 export interface AuthenticatedPrincipal {
   subject: string;
   tenantScopedSubject: string;
@@ -8,6 +12,11 @@ export interface AuthenticatedPrincipal {
   tenantId?: string;
   tokenVersion?: string;
   expiresAt: number;
+  roles?: readonly string[];
+  groups?: readonly string[];
+  wids?: readonly string[];
+  scp?: string;
+  authorization?: PrincipalAuthorization;
 }
 
 export interface MatchTickSnapshot {

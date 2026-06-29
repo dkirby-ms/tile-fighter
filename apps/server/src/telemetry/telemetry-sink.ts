@@ -153,4 +153,62 @@ export class TelemetrySink {
       timestamp: new Date().toISOString()
     });
   }
+
+  /**
+   * Emit snapshot_created for immutable region snapshot creation.
+   */
+  async emitSnapshotCreated(
+    regionId: string,
+    snapshotId: string,
+    tileCount: number,
+    expectedHash: string
+  ): Promise<void> {
+    await this.emit("snapshot_created", {
+      region_id: regionId,
+      snapshot_id: snapshotId,
+      tile_count: tileCount,
+      expected_hash: expectedHash,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  /**
+   * Emit snapshot_restore_started when replay restore begins.
+   */
+  async emitSnapshotRestoreStarted(
+    regionId: string,
+    snapshotId: string,
+    tileCount: number,
+    expectedHash: string
+  ): Promise<void> {
+    await this.emit("snapshot_restore_started", {
+      region_id: regionId,
+      snapshot_id: snapshotId,
+      tile_count: tileCount,
+      expected_hash: expectedHash,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  /**
+   * Emit snapshot_restore_completed after replay restore and verification.
+   */
+  async emitSnapshotRestoreCompleted(
+    regionId: string,
+    snapshotId: string,
+    tileCount: number,
+    expectedHash: string,
+    actualHash: string,
+    durationMs: number
+  ): Promise<void> {
+    await this.emit("snapshot_restore_completed", {
+      region_id: regionId,
+      snapshot_id: snapshotId,
+      tile_count: tileCount,
+      expected_hash: expectedHash,
+      actual_hash: actualHash,
+      duration_ms: durationMs,
+      timestamp: new Date().toISOString()
+    });
+  }
 }

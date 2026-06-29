@@ -178,4 +178,16 @@ describe("Startup migration smoke test", () => {
     const migrations = await sql`SELECT * FROM pgmigrations ORDER BY run_on`.execute(runtime!.db);
     expect(migrations.rows.length).toBeGreaterThan(0);
   });
+
+  it.skipIf(!testsCanRun || !runtime)("should have region snapshot tables from snapshot migration", async () => {
+    const tableInfo = await sql`
+      SELECT table_name
+      FROM information_schema.tables
+      WHERE table_name IN ('region_snapshots', 'region_snapshot_tiles')
+    `.execute(runtime!.db);
+
+    const tableNames = tableInfo.rows.map((row) => String((row as { table_name: string }).table_name));
+    expect(tableNames).toContain("region_snapshots");
+    expect(tableNames).toContain("region_snapshot_tiles");
+  });
 });

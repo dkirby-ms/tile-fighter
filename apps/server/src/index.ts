@@ -12,10 +12,12 @@ import {
   closeDatabaseRuntime
 } from "./persistence/db.js";
 import { createTileRepository } from "./persistence/tile.repository.js";
+import { createRegionSnapshotRepository } from "./persistence/region-snapshot.repository.js";
 import { ArenaRoom } from "./rooms/arena.room.js";
 import { registerGracefulShutdown } from "./shutdown/graceful-shutdown.js";
 import { TelemetrySink } from "./telemetry/telemetry-sink.js";
 import { SessionLifecycleService } from "./session/session-lifecycle.service.js";
+import { createRegionSnapshotService } from "./domain/region-snapshot.service.js";
 
 async function bootstrap(): Promise<void> {
   const runtimeConfig = readRuntimeConfig();
@@ -25,6 +27,12 @@ async function bootstrap(): Promise<void> {
   const authService = new AuthService(runtimeConfig);
   const telemetrySink = new TelemetrySink(runtimeConfig);
   const tileRepository = createTileRepository();
+  const regionSnapshotRepository = createRegionSnapshotRepository();
+  const regionSnapshotService = createRegionSnapshotService({
+    db: dbRuntime.db,
+    repository: regionSnapshotRepository,
+    telemetrySink
+  });
   const lifecycleService = new SessionLifecycleService({
     heartbeatTtlSeconds: runtimeConfig.sessionHeartbeatTtlSeconds,
     cleanupIntervalSeconds: runtimeConfig.sessionCleanupIntervalSeconds,
@@ -60,7 +68,8 @@ async function bootstrap(): Promise<void> {
     authService,
     lifecycleService,
     db: dbRuntime.db,
-    tileRepository
+    tileRepository,
+    regionSnapshotService
   });
 
   const nodeServer = http.createServer(app);

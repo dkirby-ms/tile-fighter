@@ -24,14 +24,42 @@ type TilesTable = {
   created_at: Date;
 };
 
+type RegionSnapshotsTable = {
+  snapshot_id: string;
+  region_id: string;
+  created_by: string;
+  tile_count: number;
+  expected_hash: string;
+  created_at: Date;
+};
+
+type RegionSnapshotTilesTable = {
+  snapshot_id: string;
+  region_id: string;
+  cell_x: number;
+  cell_y: number;
+  offset_x: number;
+  offset_y: number;
+  shape: string;
+  color: string;
+  style_payload: unknown;
+  owner_id: string;
+};
+
 export type ServerDatabase = {
   match_events: MatchEventsTable;
   tiles: TilesTable;
+  region_snapshots: RegionSnapshotsTable;
+  region_snapshot_tiles: RegionSnapshotTilesTable;
 };
 
 export type TilesSelect = Selectable<TilesTable>;
 export type TilesInsert = Insertable<TilesTable>;
 export type TilesUpdate = Updateable<TilesTable>;
+export type RegionSnapshotsSelect = Selectable<RegionSnapshotsTable>;
+export type RegionSnapshotsInsert = Insertable<RegionSnapshotsTable>;
+export type RegionSnapshotTilesSelect = Selectable<RegionSnapshotTilesTable>;
+export type RegionSnapshotTilesInsert = Insertable<RegionSnapshotTilesTable>;
 
 export type DatabaseRuntime = {
   db: Kysely<ServerDatabase>;
