@@ -46,10 +46,11 @@ Playable Layer 1 means any authenticated player can open the web client, place t
 
 - User story: As a player, I can open the game shell and establish an authenticated session so I can enter the shared world.
 - Acceptance criteria:
-  - Given shell state `token-ready` after External ID OAuth acquisition, when bootstrap runs, then session bootstrap returns player context and shell init metadata.
-  - Given an invalid token, when bootstrap runs, then access is denied with a non-leaky error code.
-  - Given bootstrap receives `401`, when the client reacquires silently once, then bootstrap retries exactly once before interactive auth is required.
-  - Given bootstrap success, when telemetry is initialized, then `session_started` is emitted once.
+  - Given shell state token-ready after External ID OAuth acquisition, when bootstrap runs, then session bootstrap returns player context and shell init metadata.
+  - Given invalid token, when bootstrap runs, then access is denied with a non-leaky error code.
+  - Given bootstrap receives 401, when the client performs one silent reacquire attempt, then bootstrap retries exactly once.
+  - Given bounded retry still returns unauthorized, when retry completes, then the client transitions to interaction-required and stops silent retry loops.
+  - Given bootstrap success, when telemetry initializes, then session_started is emitted once.
 - Technical notes: shell uses External ID OAuth authorization code with PKCE and state machine `signed-out`, `acquiring-token-silently`, `interaction-required`, `token-ready`, `bootstrap-in-flight`, `bootstrap-failed`; server auth middleware + bootstrap endpoint; bounded retry policy (`maxBootstrap401Retry=1`).
 - Test requirements: unit (token parser and version pinning), integration (bootstrap auth + telemetry), smoke (open shell path from token-ready state).
 - Telemetry events required: `session_started`, `session_bootstrap_failed`.
@@ -66,7 +67,9 @@ Playable Layer 1 means any authenticated player can open the web client, place t
 
 - User story: As a player, I can request a signed room join credential so room access remains authoritative.
 - Acceptance criteria:
-  - Given an authenticated session, when join token is requested, then server returns short-lived signed room token.
+  - Given an authenticated session, when join token is requested, then the client attaches an Authorization bearer token and server returns a short-lived signed room token.
+  - Given the first join-token request returns 401, when client performs one silent reacquire, then request retries exactly once.
+  - Given retry remains unauthorized, when retry completes, then client transitions to interaction-required terminal fallback.
   - Given expired join token, when room join is attempted, then join is rejected and refresh path is offered.
   - Given valid join token, when join occurs, then server binds player identity to room presence.
 - Technical notes: auth service token minting; room admission guard.
@@ -81,9 +84,11 @@ Playable Layer 1 means any authenticated player can open the web client, place t
 
 - User story: As an operator, I can observe session liveness so I can detect churn and startup failures.
 - Acceptance criteria:
-  - Given an active session, when heartbeat interval elapses, then `session_heartbeat` is persisted.
+  - Given an active session, when heartbeat interval elapses, then client heartbeat request includes Authorization bearer token and server persists session_heartbeat.
+  - Given first heartbeat call returns 401, when client silently reacquires token once, then heartbeat retries exactly once.
+  - Given retry remains unauthorized, when retry completes, then client transitions to interaction-required terminal fallback and heartbeat loop stops until re-auth.
   - Given heartbeat timeout, when server marks stale session, then player presence is cleared.
-  - Given session end, when client disconnects cleanly, then `session_ended` is emitted.
+  - Given session end, when client disconnects cleanly, then session_ended is emitted.
 - Technical notes: heartbeat channel in room + telemetry sink.
 - Test requirements: unit (timeout rules), integration (presence cleanup), load (heartbeat overhead check).
 - Telemetry events required: `session_heartbeat`, `session_ended`, `presence_cleared`.
@@ -128,10 +133,9 @@ Playable Layer 1 means any authenticated player can open the web client, place t
 
 - User story: As a player, I can place a tile and edit my own tile within 10 minutes so collaboration remains fair.
 - Acceptance criteria:
-  - Given empty coordinate, when place is requested, then tile is accepted and ack returned.
-  - Given occupied coordinate, when place is requested, then request is rejected with occupied reason.
-  - Given own tile younger than 10 minutes, when edit requested, then tile replacement succeeds.
-  - Given own tile older than 10 minutes, when edit requested, then edit is denied.
+  - Given/When/Then: empty coordinate -> placement accepted with ack
+  - Given/When/Then: occupied coordinate -> placement rejected with occupied reason
+  - Given/When/Then: own tile older than 10m -> edit denied
 - Technical notes: authoritative placement command handler with edit-window policy.
 - Test requirements: unit (window policy), integration (place/edit/occupied), load (hot-cell contention).
 - Telemetry events required: `tile_placed`, `tile_place_rejected`, `tile_edited`.
@@ -144,9 +148,9 @@ Playable Layer 1 means any authenticated player can open the web client, place t
 
 - User story: As an operator, I can restore a region snapshot so service recovery is predictable.
 - Acceptance criteria:
-  - Given snapshot trigger, when job runs, then region snapshot metadata is written immutably.
-  - Given region failure, when replay is invoked, then region state restores to last consistent snapshot.
-  - Given replay completion, when consistency check runs, then hash matches expected state.
+  - Given/When/Then: snapshot trigger -> immutable snapshot metadata written
+  - Given/When/Then: region failure -> replay restores last consistent snapshot
+  - Given/When/Then: post-replay check -> expected hash matches
 - Technical notes: snapshot worker + replay command path.
 - Test requirements: integration (snapshot/replay), smoke (restore drill), ops test (failure simulation).
 - Telemetry events required: `snapshot_created`, `snapshot_restore_started`, `snapshot_restore_completed`.
@@ -159,9 +163,9 @@ Playable Layer 1 means any authenticated player can open the web client, place t
 
 - User story: As a client, I can request region tile diffs so I only fetch nearby state.
 - Acceptance criteria:
-  - Given viewport coordinates, when diff query is called, then only relevant region tiles are returned.
-  - Given unchanged region version, when diff query is called, then empty diff response is returned.
-  - Given stale version token, when diff query is called, then server returns incremental updates.
+  - Given/When/Then: viewport request -> only relevant region tiles returned
+  - Given/When/Then: unchanged version -> empty diff response
+  - Given/When/Then: stale version -> incremental updates returned
 - Technical notes: region-version index and diff endpoint.
 - Test requirements: unit (diff assembler), integration (versioned diff), load (read amplification).
 - Telemetry events required: `tile_diff_requested`, `tile_diff_returned`.
