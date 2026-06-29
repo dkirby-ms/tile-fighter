@@ -318,4 +318,158 @@ describe("TileRepository", () => {
       expect(result?.cell_y).toBe(0);
     });
   });
+
+  describe("editTileWithinSelfEditWindow", () => {
+    it("should return success when owner matches and tile is within self-edit window", async () => {
+      const now = new Date("2026-06-29T12:10:00.000Z");
+
+      const mockDb = {
+        updateTable: vi.fn().mockReturnThis(),
+        set: vi.fn().mockReturnThis(),
+        where: vi.fn().mockReturnThis(),
+        returning: vi.fn().mockReturnThis(),
+        executeTakeFirst: vi.fn().mockResolvedValue({ id: 77 })
+      } as unknown as Kysely<ServerDatabase>;
+
+      const result = await repository.editTileWithinSelfEditWindow(mockDb, {
+        regionId: "region-1",
+        cellX: 1,
+        cellY: 2,
+        shape: "triangle",
+        color: "blue",
+        stylePayload: { pattern: "dots" },
+        ownerId: "owner-1",
+        now,
+        selfEditWindowMs: 10 * 60 * 1000
+      });
+
+      expect(result).toEqual({
+        ok: true,
+        tile: {
+          id: 77,
+          editedAt: now
+        }
+      });
+    });
+
+    it("should return forbidden_owner_mismatch when existing tile belongs to another owner", async () => {
+      const now = new Date("2026-06-29T12:10:00.000Z");
+
+      const mockDb = {
+        updateTable: vi.fn().mockReturnThis(),
+        set: vi.fn().mockReturnThis(),
+        where: vi.fn().mockReturnThis(),
+        returning: vi.fn().mockReturnThis(),
+        executeTakeFirst: vi
+          .fn()
+          .mockResolvedValueOnce(null)
+          .mockResolvedValueOnce({
+            id: 99,
+            region_id: "region-1",
+            cell_x: 1,
+            cell_y: 2,
+            offset_x: 0,
+            offset_y: 0,
+            shape: "square",
+            color: "red",
+            style_payload: {},
+            owner_id: "different-owner",
+            created_at: new Date("2026-06-29T12:00:00.000Z")
+          }),
+        selectFrom: vi.fn().mockReturnThis(),
+        selectAll: vi.fn().mockReturnThis()
+      } as unknown as Kysely<ServerDatabase>;
+
+      const result = await repository.editTileWithinSelfEditWindow(mockDb, {
+        regionId: "region-1",
+        cellX: 1,
+        cellY: 2,
+        shape: "triangle",
+        color: "blue",
+        stylePayload: { pattern: "dots" },
+        ownerId: "owner-1",
+        now,
+        selfEditWindowMs: 10 * 60 * 1000
+      });
+
+      expect(result).toEqual({
+        ok: false,
+        reason: "forbidden_owner_mismatch"
+      });
+    });
+
+    it("should return edit_window_expired when owner matches but created_at is outside window", async () => {
+      const now = new Date("2026-06-29T12:20:00.000Z");
+
+      const mockDb = {
+        updateTable: vi.fn().mockReturnThis(),
+        set: vi.fn().mockReturnThis(),
+        where: vi.fn().mockReturnThis(),
+        returning: vi.fn().mockReturnThis(),
+        executeTakeFirst: vi
+          .fn()
+          .mockResolvedValueOnce(null)
+          .mockResolvedValueOnce({
+            id: 100,
+            region_id: "region-1",
+            cell_x: 5,
+            cell_y: 6,
+            offset_x: 0,
+            offset_y: 0,
+            shape: "square",
+            color: "red",
+            style_payload: {},
+            owner_id: "owner-1",
+            created_at: new Date("2026-06-29T12:00:00.000Z")
+          }),
+        selectFrom: vi.fn().mockReturnThis(),
+        selectAll: vi.fn().mockReturnThis()
+      } as unknown as Kysely<ServerDatabase>;
+
+      const result = await repository.editTileWithinSelfEditWindow(mockDb, {
+        regionId: "region-1",
+        cellX: 5,
+        cellY: 6,
+        shape: "triangle",
+        color: "blue",
+        stylePayload: { pattern: "dots" },
+        ownerId: "owner-1",
+        now,
+        selfEditWindowMs: 10 * 60 * 1000
+      });
+
+      expect(result).toEqual({
+        ok: false,
+        reason: "edit_window_expired"
+      });
+    });
+
+    it("should include created_at >= windowStart boundary predicate in update query", async () => {
+      const now = new Date("2026-06-29T12:10:00.000Z");
+      const where = vi.fn().mockReturnThis();
+
+      const mockDb = {
+        updateTable: vi.fn().mockReturnThis(),
+        set: vi.fn().mockReturnThis(),
+        where,
+        returning: vi.fn().mockReturnThis(),
+        executeTakeFirst: vi.fn().mockResolvedValue({ id: 1 })
+      } as unknown as Kysely<ServerDatabase>;
+
+      await repository.editTileWithinSelfEditWindow(mockDb, {
+        regionId: "region-1",
+        cellX: 0,
+        cellY: 0,
+        shape: "square",
+        color: "red",
+        stylePayload: {},
+        ownerId: "owner-1",
+        now,
+        selfEditWindowMs: 10 * 60 * 1000
+      });
+
+      const expectedWindowStart = new Date("2026-06-29T12:00:00.000Z");
+      expect(where).toHaveBeenCalledWith("created_at", ">=", expectedWindowStart);
+    });
+  });
 });

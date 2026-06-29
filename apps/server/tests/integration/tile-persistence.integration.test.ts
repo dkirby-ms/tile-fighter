@@ -308,4 +308,131 @@ describe("Tile persistence integration", () => {
     // Note: Testing invalid offsets would require direct SQL since the repository
     // doesn't validate them - the database constraint handles validation
   });
+
+  it.skipIf(!testsCanRun || !db)("should allow owner edit when within 10-minute self-edit window", async () => {
+    const regionId = "test-edit-window-allow";
+
+    const inserted = await repository.insertTile(db, {
+      regionId,
+      cellX: 7,
+      cellY: 7,
+      offsetX: 0,
+      offsetY: 0,
+      shape: "square",
+      color: "red",
+      stylePayload: { layer: 1 },
+      ownerId: "owner-allow"
+    });
+
+    expect(inserted.ok).toBe(true);
+
+    const existing = await repository.selectTileByCoordinate(db, regionId, 7, 7);
+    expect(existing).not.toBeNull();
+
+    const editResult = await repository.editTileWithinSelfEditWindow(db, {
+      regionId,
+      cellX: 7,
+      cellY: 7,
+      shape: "triangle",
+      color: "blue",
+      stylePayload: { layer: 2 },
+      ownerId: "owner-allow",
+      now: new Date(existing!.created_at.getTime() + 60_000),
+      selfEditWindowMs: 10 * 60 * 1000
+    });
+
+    expect(editResult.ok).toBe(true);
+
+    const updated = await repository.selectTileByCoordinate(db, regionId, 7, 7);
+    expect(updated).not.toBeNull();
+    expect(updated?.shape).toBe("triangle");
+    expect(updated?.color).toBe("blue");
+    expect(updated?.style_payload).toEqual({ layer: 2 });
+    expect(updated?.owner_id).toBe("owner-allow");
+  });
+
+  it.skipIf(!testsCanRun || !db)("should reject edit for non-owner with forbidden_owner_mismatch", async () => {
+    const regionId = "test-edit-owner-mismatch";
+
+    const inserted = await repository.insertTile(db, {
+      regionId,
+      cellX: 8,
+      cellY: 8,
+      offsetX: 0,
+      offsetY: 0,
+      shape: "square",
+      color: "red",
+      stylePayload: {},
+      ownerId: "owner-original"
+    });
+
+    expect(inserted.ok).toBe(true);
+
+    const existing = await repository.selectTileByCoordinate(db, regionId, 8, 8);
+    expect(existing).not.toBeNull();
+
+    const editResult = await repository.editTileWithinSelfEditWindow(db, {
+      regionId,
+      cellX: 8,
+      cellY: 8,
+      shape: "hex",
+      color: "green",
+      stylePayload: { edit: true },
+      ownerId: "owner-other",
+      now: new Date(existing!.created_at.getTime() + 30_000),
+      selfEditWindowMs: 10 * 60 * 1000
+    });
+
+    expect(editResult).toEqual({
+      ok: false,
+      reason: "forbidden_owner_mismatch"
+    });
+
+    const unchanged = await repository.selectTileByCoordinate(db, regionId, 8, 8);
+    expect(unchanged?.shape).toBe("square");
+    expect(unchanged?.color).toBe("red");
+    expect(unchanged?.owner_id).toBe("owner-original");
+  });
+
+  it.skipIf(!testsCanRun || !db)("should reject owner edit after self-edit window expires", async () => {
+    const regionId = "test-edit-expired";
+
+    const inserted = await repository.insertTile(db, {
+      regionId,
+      cellX: 9,
+      cellY: 9,
+      offsetX: 0,
+      offsetY: 0,
+      shape: "square",
+      color: "red",
+      stylePayload: {},
+      ownerId: "owner-expired"
+    });
+
+    expect(inserted.ok).toBe(true);
+
+    const existing = await repository.selectTileByCoordinate(db, regionId, 9, 9);
+    expect(existing).not.toBeNull();
+
+    const editResult = await repository.editTileWithinSelfEditWindow(db, {
+      regionId,
+      cellX: 9,
+      cellY: 9,
+      shape: "diamond",
+      color: "purple",
+      stylePayload: { edit: "late" },
+      ownerId: "owner-expired",
+      now: new Date(existing!.created_at.getTime() + 10 * 60 * 1000 + 1),
+      selfEditWindowMs: 10 * 60 * 1000
+    });
+
+    expect(editResult).toEqual({
+      ok: false,
+      reason: "edit_window_expired"
+    });
+
+    const unchanged = await repository.selectTileByCoordinate(db, regionId, 9, 9);
+    expect(unchanged?.shape).toBe("square");
+    expect(unchanged?.color).toBe("red");
+  });
 });

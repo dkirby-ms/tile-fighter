@@ -23,3 +23,45 @@ export interface ReadinessReport {
     config: "ok" | "error";
   };
 }
+
+export interface TilePlaceCommand {
+  regionId: string;
+  cellX: number;
+  cellY: number;
+  offsetX: number;
+  offsetY: number;
+  shape: string;
+  color: string;
+  stylePayload: unknown;
+}
+
+export type TilePlaceResult =
+  | {
+      ok: true;
+      tileId: number;
+      createdAt: string;
+    }
+  | {
+      ok: false;
+      reason: "occupied";
+    };
+
+export interface TileEditCommand {
+  regionId: string;
+  cellX: number;
+  cellY: number;
+  shape: string;
+  color: string;
+  stylePayload: unknown;
+}
+
+export type TileEditResult =
+  | {
+      ok: true;
+      tileId: number;
+      editedAt: string;
+    }
+  | {
+      ok: false;
+      reason: "forbidden_owner_mismatch" | "edit_window_expired";
+    };

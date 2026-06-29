@@ -60,53 +60,53 @@ Implement server-authoritative tile placement and a creator-only 10-minute self-
 
 ## Implementation Checklist
 
-### [ ] Implementation Phase 1: Route, Shared Contract, and Policy Surface
+### [x] Implementation Phase 1: Route, Shared Contract, and Policy Surface
 
 <!-- parallelizable: false -->
 
-* [ ] Step 1.1: Add a dedicated tile route module for authoritative placement and edit commands
+* [x] Step 1.1: Add a dedicated tile route module for authoritative placement and edit commands
   * Details: .copilot-tracking/details/2026-06-29/issue-14-authoritative-placement-self-edit-window-details.md (Lines 25-49)
-* [ ] Step 1.2: Mount the new tile routes in the HTTP app after authentication middleware
+* [x] Step 1.2: Mount the new tile routes in the HTTP app after authentication middleware
   * Details: .copilot-tracking/details/2026-06-29/issue-14-authoritative-placement-self-edit-window-details.md (Lines 51-71)
-* [ ] Step 1.3: Add shared tile command and result DTOs for placement and edit flows
+* [x] Step 1.3: Add shared tile command and result DTOs for placement and edit flows
   * Details: .copilot-tracking/details/2026-06-29/issue-14-authoritative-placement-self-edit-window-details.md (Lines 73-97)
 
-### [ ] Implementation Phase 2: Repository, Persistence, and Telemetry
+### [x] Implementation Phase 2: Repository, Persistence, and Telemetry
 
 <!-- parallelizable: true -->
 
-* [ ] Step 2.1: Extend tile repository with authoritative insert and bounded update operations
+* [x] Step 2.1: Extend tile repository with authoritative insert and bounded update operations
   * Details: .copilot-tracking/details/2026-06-29/issue-14-authoritative-placement-self-edit-window-details.md (Lines 99-122)
-* [ ] Step 2.2: Add or adjust persistence schema for edit audit metadata if required by the selected implementation
+* [x] Step 2.2: Add or adjust persistence schema for edit audit metadata if required by the selected implementation
   * Details: .copilot-tracking/details/2026-06-29/issue-14-authoritative-placement-self-edit-window-details.md (Lines 124-145)
-* [ ] Step 2.3: Add telemetry helpers for tile_placed, tile_place_rejected, and tile_edited
+* [x] Step 2.3: Add telemetry helpers for tile_placed, tile_place_rejected, and tile_edited
   * Details: .copilot-tracking/details/2026-06-29/issue-14-authoritative-placement-self-edit-window-details.md (Lines 147-168)
-* [ ] Step 2.4: Validate repository, schema, and telemetry changes
+* [x] Step 2.4: Validate repository, schema, and telemetry changes
   * Run server lint and build focused on modified files
   * Confirm deterministic conflict mapping and edit-window policy compile cleanly
 
-### [ ] Implementation Phase 3: Tests and Load Coverage
+### [x] Implementation Phase 3: Tests and Load Coverage
 
 <!-- parallelizable: false -->
 
-* [ ] Step 3.1: Extend repository unit tests for owner, conflict, and edit-window boundaries
+* [x] Step 3.1: Extend repository unit tests for owner, conflict, and edit-window boundaries
   * Details: .copilot-tracking/details/2026-06-29/issue-14-authoritative-placement-self-edit-window-details.md (Lines 190-210)
-* [ ] Step 3.2: Extend persistence integration tests for place, reject, edit, and expiry scenarios
+* [x] Step 3.2: Extend persistence integration tests for place, reject, edit, and expiry scenarios
   * Details: .copilot-tracking/details/2026-06-29/issue-14-authoritative-placement-self-edit-window-details.md (Lines 212-232)
-* [ ] Step 3.3: Extend startup migration smoke coverage for any additive metadata columns
+* [x] Step 3.3: Extend startup migration smoke coverage for any additive metadata columns
   * Details: .copilot-tracking/details/2026-06-29/issue-14-authoritative-placement-self-edit-window-details.md (Lines 234-253)
-* [ ] Step 3.4: Add or update load coverage for placement contention and throttle behavior
+* [x] Step 3.4: Add or update load coverage for placement contention and throttle behavior
   * Details: .copilot-tracking/details/2026-06-29/issue-14-authoritative-placement-self-edit-window-details.md (Lines 255-279)
 
-### [ ] Implementation Phase 4: Final Validation
+### [x] Implementation Phase 4: Final Validation
 
 <!-- parallelizable: false -->
 
-* [ ] Step 4.1: Run full workspace validation
+* [x] Step 4.1: Run full workspace validation
   * Execute repository lint, build, and test commands at workspace scope
-* [ ] Step 4.2: Fix minor issues surfaced by validation
+* [x] Step 4.2: Fix minor issues surfaced by validation
   * Iterate on local lint, type, or test failures introduced by the plan changes
-* [ ] Step 4.3: Report any blocking gaps
+* [x] Step 4.3: Report any blocking gaps
   * Document issues that need additional research or product clarification
   * Keep the plan narrow and avoid broad refactors in this phase
 

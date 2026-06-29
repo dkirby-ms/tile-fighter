@@ -34,6 +34,28 @@ export type InsertTileResult =
   | { ok: false; reason: "coordinate_conflict"; error: TileConflictError };
 
 /**
+ * Input type for bounded tile edits using server time and created_at anchor
+ */
+export type EditTileInput = {
+  regionId: string;
+  cellX: number;
+  cellY: number;
+  shape: string;
+  color: string;
+  stylePayload: unknown;
+  ownerId: string;
+  now: Date;
+  selfEditWindowMs: number;
+};
+
+/**
+ * Result type for bounded edit operation with deterministic rejection reasons
+ */
+export type EditTileResult =
+  | { ok: true; tile: { id: number; editedAt: Date } }
+  | { ok: false; reason: "forbidden_owner_mismatch" | "edit_window_expired" };
+
+/**
  * Tile Repository interface for data access
  */
 export interface ITileRepository {
@@ -41,6 +63,10 @@ export interface ITileRepository {
     db: Kysely<ServerDatabase>,
     input: InsertTileInput
   ): Promise<InsertTileResult>;
+  editTileWithinSelfEditWindow(
+    db: Kysely<ServerDatabase>,
+    input: EditTileInput
+  ): Promise<EditTileResult>;
   selectTilesByRegion(
     db: Kysely<ServerDatabase>,
     regionId: string
@@ -119,6 +145,61 @@ export class TileRepository implements ITileRepository {
       // Re-throw any other errors
       throw error;
     }
+  }
+
+  /**
+   * Edit a tile only when owner matches and created_at is within self-edit window.
+   * created_at remains the policy anchor and is never updated.
+   */
+  async editTileWithinSelfEditWindow(
+    db: Kysely<ServerDatabase>,
+    input: EditTileInput
+  ): Promise<EditTileResult> {
+    const windowStart = new Date(input.now.getTime() - input.selfEditWindowMs);
+
+    const updated = await db
+      .updateTable("tiles")
+      .set({
+        shape: input.shape,
+        color: input.color,
+        style_payload: input.stylePayload
+      })
+      .where("region_id", "=", input.regionId)
+      .where("cell_x", "=", input.cellX)
+      .where("cell_y", "=", input.cellY)
+      .where("owner_id", "=", input.ownerId)
+      .where("created_at", ">=", windowStart)
+      .returning(["id"])
+      .executeTakeFirst();
+
+    if (updated) {
+      return {
+        ok: true,
+        tile: {
+          id: updated.id,
+          editedAt: input.now
+        }
+      };
+    }
+
+    const existing = await this.selectTileByCoordinate(
+      db,
+      input.regionId,
+      input.cellX,
+      input.cellY
+    );
+
+    if (!existing || existing.owner_id !== input.ownerId) {
+      return {
+        ok: false,
+        reason: "forbidden_owner_mismatch"
+      };
+    }
+
+    return {
+      ok: false,
+      reason: "edit_window_expired"
+    };
   }
 
   /**

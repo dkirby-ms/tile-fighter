@@ -11,6 +11,7 @@ import {
   verifyDatabaseConnectivity,
   closeDatabaseRuntime
 } from "./persistence/db.js";
+import { createTileRepository } from "./persistence/tile.repository.js";
 import { ArenaRoom } from "./rooms/arena.room.js";
 import { registerGracefulShutdown } from "./shutdown/graceful-shutdown.js";
 import { TelemetrySink } from "./telemetry/telemetry-sink.js";
@@ -23,6 +24,7 @@ async function bootstrap(): Promise<void> {
 
   const authService = new AuthService(runtimeConfig);
   const telemetrySink = new TelemetrySink(runtimeConfig);
+  const tileRepository = createTileRepository();
   const lifecycleService = new SessionLifecycleService({
     heartbeatTtlSeconds: runtimeConfig.sessionHeartbeatTtlSeconds,
     cleanupIntervalSeconds: runtimeConfig.sessionCleanupIntervalSeconds,
@@ -56,7 +58,9 @@ async function bootstrap(): Promise<void> {
     authMiddleware: buildAuthMiddleware(authService),
     telemetrySink,
     authService,
-    lifecycleService
+    lifecycleService,
+    db: dbRuntime.db,
+    tileRepository
   });
 
   const nodeServer = http.createServer(app);

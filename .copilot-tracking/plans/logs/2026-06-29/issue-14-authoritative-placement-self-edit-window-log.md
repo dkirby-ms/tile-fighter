@@ -12,10 +12,27 @@ Gaps and differences identified between research findings and the implementation
   * Reason: The research notes that the issue does not specify the exact window and limit.
   * Impact: high
 
+* DR-04: Integration scenarios run with skip semantics when `TEST_DATABASE_URL` is unavailable in the local environment.
+  * Source: Phase 3 and Phase 4 validation runs.
+  * Reason: Integration and migration smoke suites depend on live test database connectivity.
+  * Impact: medium
+
 ### Plan Notes
 
 * The plan is intentionally route-based and keeps the 10-minute edit window anchored to created_at.
 * The plan preserves existing persistence telemetry while adding story-level tile events.
+
+### Implementation Deviations
+
+* DD-06: Tile route mount is conditional on persistence dependencies.
+  * Plan specifies: Mount tile routes after auth middleware in app composition.
+  * Implementation differs: Route mount occurs after auth middleware only when db and tileRepository are provided.
+  * Rationale: Keeps existing app composition compatible for contexts that may instantiate HTTP app without persistence wiring.
+
+* DD-07: Audit metadata migration intentionally skipped in Phase 2.
+  * Plan specifies: Add or adjust schema only if required by selected implementation.
+  * Implementation differs: No new migration added.
+  * Rationale: Existing created_at and owner_id schema fields fully support deterministic 10-minute self-edit policy; additional columns deferred to follow-on work.
 
 ## Implementation Paths Considered
 
@@ -66,3 +83,8 @@ Items identified during planning that fall outside current scope.
   * Source: .copilot-tracking/research/2026-06-29/issue-14-authoritative-placement-self-edit-window-research.md (Implementation Impact)
   * Dependency: Issue-specific load coverage complete
   * Effort estimate: medium
+
+* WI-05: Add explicit per-account placement throttle on tile placement endpoint if product confirms this must be route-local - high priority
+  * Source: Phase 3 load-test implementation feedback
+  * Dependency: Product clarification on throttle semantics
+  * Effort estimate: small

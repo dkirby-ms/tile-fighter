@@ -93,4 +93,64 @@ export class TelemetrySink {
       timestamp: new Date().toISOString()
     });
   }
+
+  /**
+   * Emit tile_placed event for story-level authoritative placement success.
+   */
+  async emitTilePlaced(
+    tileId: number,
+    regionId: string,
+    cellX: number,
+    cellY: number,
+    ownerId: string
+  ): Promise<void> {
+    await this.emit("tile_placed", {
+      tile_id: tileId,
+      region_id: regionId,
+      cell_x: cellX,
+      cell_y: cellY,
+      owner_id: ownerId,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  /**
+   * Emit tile_place_rejected event for story-level placement rejection outcomes.
+   */
+  async emitTilePlaceRejected(
+    regionId: string,
+    cellX: number,
+    cellY: number,
+    attemptedOwnerId: string,
+    reason: string
+  ): Promise<void> {
+    await this.emit("tile_place_rejected", {
+      region_id: regionId,
+      cell_x: cellX,
+      cell_y: cellY,
+      attempted_owner_id: attemptedOwnerId,
+      reason,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  /**
+   * Emit tile_edited event for story-level bounded edit success.
+   */
+  async emitTileEdited(
+    tileId: number,
+    regionId: string,
+    cellX: number,
+    cellY: number,
+    ownerId: string
+  ): Promise<void> {
+    await this.emit("tile_edited", {
+      tile_id: tileId,
+      region_id: regionId,
+      cell_x: cellX,
+      cell_y: cellY,
+      owner_id: ownerId,
+      timestamp: new Date().toISOString()
+    });
+  }
 }
