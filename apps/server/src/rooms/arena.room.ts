@@ -1,4 +1,4 @@
-import { Client, Room } from "colyseus";
+import { Client, Room } from "@colyseus/core";
 import { CombatSimulationService } from "../domain/combat-simulation.service.js";
 import { ArenaState } from "./arena.state.js";
 import { AuthService } from "../auth/auth-service.js";

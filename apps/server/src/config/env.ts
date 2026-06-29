@@ -1,7 +1,11 @@
 import { config as loadDotEnv } from "dotenv";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { z } from "zod";
 
-loadDotEnv();
+const runtimeEnvPath = resolve(dirname(fileURLToPath(import.meta.url)), "../../../../.env");
+
+loadDotEnv({ path: runtimeEnvPath });
 
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
@@ -17,7 +21,7 @@ const envSchema = z.object({
   DENIED_TENANT_IDS: z.string().optional(),
   ALLOWED_ISSUERS: z.string().optional(),
   TELEMETRY_SINK_MODE: z.enum(["off", "optional", "required"]).default("optional"),
-  TELEMETRY_SINK_URL: z.string().url().optional(),
+  TELEMETRY_SINK_URL: z.preprocess((value) => (value === "" ? undefined : value), z.string().url().optional()),
   TELEMETRY_SINK_NAME: z.string().optional(),
   JOIN_TOKEN_SIGNING_SECRET: z.string().min(32),
   JOIN_TOKEN_TTL_SECONDS: z.coerce.number().int().positive().max(120).default(120),

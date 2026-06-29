@@ -1,6 +1,12 @@
+import { config as loadDotEnv } from "dotenv";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { Client } from "@colyseus/sdk";
 import { spawn } from "node:child_process";
 import { mkdir, writeFile } from "node:fs/promises";
+
+const runtimeEnvPath = resolve(dirname(fileURLToPath(import.meta.url)), "../../../../.env");
+loadDotEnv({ path: runtimeEnvPath });
 
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
 const REQUIRED_SERVER_ENV = [
