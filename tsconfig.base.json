@@ -16,6 +16,7 @@
     "sourceMap": true,
     "experimentalDecorators": true,
     "useDefineForClassFields": false,
+    "ignoreDeprecations": "6.0",
     "baseUrl": ".",
     "paths": {
       "@game/shared-auth": ["packages/shared-auth/src"],

@@ -1,4 +1,4 @@
-import { Kysely, PostgresDialect, sql, Selectable, Insertable, Updateable } from "kysely";
+import { Kysely, PostgresDialect, sql, Selectable, Insertable, Updateable, Generated } from "kysely";
 import { Pool } from "pg";
 import { readinessSql } from "@game/shared-persistence";
 
@@ -86,6 +86,22 @@ type SessionCheckpointsTable = {
   archived_at: Date | null;
 };
 
+type PlacementCommandsTable = {
+  id: Generated<number>;
+  region_id: string;
+  actor_id: string;
+  command_id: string;
+  request_hash: string;
+  outcome: string;
+  response_snapshot: unknown;
+  winner_owner_id: string | null;
+  winner_tile_id: number | null;
+  winner_resolved_at: Date | null;
+  expires_at: Date;
+  created_at: Date;
+  updated_at: Date;
+};
+
 export type ServerDatabase = {
   match_events: MatchEventsTable;
   tiles: TilesTable;
@@ -94,6 +110,7 @@ export type ServerDatabase = {
   region_versions: RegionVersionsTable;
   tile_deltas: TileDeltasTable;
   session_checkpoints: SessionCheckpointsTable;
+  placement_commands: PlacementCommandsTable;
 };
 
 export type TilesSelect = Selectable<TilesTable>;
@@ -110,6 +127,9 @@ export type TileDeltasInsert = Insertable<TileDeltasTable>;
 export type SessionCheckpointsSelect = Selectable<SessionCheckpointsTable>;
 export type SessionCheckpointsInsert = Insertable<SessionCheckpointsTable>;
 export type SessionCheckpointsUpdate = Updateable<SessionCheckpointsTable>;
+export type PlacementCommandsSelect = Selectable<PlacementCommandsTable>;
+export type PlacementCommandsInsert = Insertable<PlacementCommandsTable>;
+export type PlacementCommandsUpdate = Updateable<PlacementCommandsTable>;
 
 export type DatabaseRuntime = {
   db: Kysely<ServerDatabase>;

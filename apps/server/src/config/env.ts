@@ -31,6 +31,7 @@ const envSchema = z.object({
   TILE_PLACE_THROTTLE_MAX_REQUESTS: z.coerce.number().int().positive().default(5),
   TILE_PLACE_THROTTLE_WINDOW_MS: z.coerce.number().int().positive().default(60_000),
   TILE_PLACE_THROTTLE_TTL_MS: z.coerce.number().int().positive().default(24 * 60 * 60 * 1000),
+  PLACEMENT_COMMAND_REPLAY_WINDOW_SECONDS: z.coerce.number().int().positive().max(24 * 60 * 60).default(900),
   REGION_DIFF_DEFAULT_MAX_TILES: z.coerce.number().int().positive().default(500),
   REGION_DIFF_MAX_TILES_PER_REQUEST: z.coerce.number().int().positive().default(1_000),
   REGION_DIFF_MAX_VIEWPORT_AREA: z.coerce.number().int().positive().default(10_000),
@@ -64,6 +65,7 @@ export type RuntimeConfig = {
   tilePlaceThrottleMaxRequests: number;
   tilePlaceThrottleWindowMs: number;
   tilePlaceThrottleTtlMs: number;
+  placementCommandReplayWindowSeconds: number;
   regionDiffDefaultMaxTiles: number;
   regionDiffMaxTilesPerRequest: number;
   regionDiffMaxViewportArea: number;
@@ -115,6 +117,7 @@ export function readRuntimeConfig(): RuntimeConfig {
     tilePlaceThrottleMaxRequests: parsed.TILE_PLACE_THROTTLE_MAX_REQUESTS,
     tilePlaceThrottleWindowMs: parsed.TILE_PLACE_THROTTLE_WINDOW_MS,
     tilePlaceThrottleTtlMs: parsed.TILE_PLACE_THROTTLE_TTL_MS,
+    placementCommandReplayWindowSeconds: parsed.PLACEMENT_COMMAND_REPLAY_WINDOW_SECONDS,
     regionDiffDefaultMaxTiles: parsed.REGION_DIFF_DEFAULT_MAX_TILES,
     regionDiffMaxTilesPerRequest: parsed.REGION_DIFF_MAX_TILES_PER_REQUEST,
     regionDiffMaxViewportArea: parsed.REGION_DIFF_MAX_VIEWPORT_AREA,

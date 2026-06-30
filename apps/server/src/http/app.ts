@@ -127,6 +127,7 @@ export function createHttpApp(dependencies: HttpAppDependencies) {
       createTileRoutes({
         placeTile: async (input) => {
           const result = await dependencies.tileRepository!.insertTile(dependencies.db!, {
+            commandId: input.commandId,
             regionId: input.regionId,
             cellX: input.cellX,
             cellY: input.cellY,
@@ -139,6 +140,15 @@ export function createHttpApp(dependencies: HttpAppDependencies) {
           });
 
           if (!result.ok) {
+            if (result.reason === "command_payload_mismatch") {
+              return {
+                ok: false as const,
+                reason: "command_payload_mismatch" as const,
+                commandId: result.commandId,
+                regionId: result.regionId
+              };
+            }
+
             await dependencies.telemetrySink.emitTilePlaceRejected(
               input.regionId,
               input.cellX,
@@ -148,7 +158,19 @@ export function createHttpApp(dependencies: HttpAppDependencies) {
             );
             return {
               ok: false as const,
-              reason: "occupied" as const
+              reason: "occupied" as const,
+              commandId: result.commandId,
+              regionId: result.regionId,
+              cell: {
+                cellX: result.error.cell_x,
+                cellY: result.error.cell_y
+              },
+              winner: {
+                ownerId: result.error.winner_owner_id ?? "unknown",
+                tileId: result.error.winner_tile_id ?? 0,
+                resolvedAt: (result.error.winner_resolved_at ?? new Date()).toISOString()
+              },
+              replayed: result.replayed
             };
           }
 
@@ -195,7 +217,8 @@ export function createHttpApp(dependencies: HttpAppDependencies) {
           return {
             ok: true as const,
             tileId: result.tile.id,
-            createdAt: result.tile.createdAt
+            createdAt: result.tile.createdAt,
+            replayed: result.replayed
           };
         },
         shouldThrottleTilePlace: async ({ key, nowMs, regionId, cellX, cellY, ownerId }) => {

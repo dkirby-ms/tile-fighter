@@ -57,3 +57,35 @@ export type ReconnectFailureResult = {
 };
 
 export type ReconnectResolution = ReconnectReplayResult | ReconnectFailureResult;
+
+export type PlacementConflictWinner = {
+  ownerId: string;
+  tileId: number;
+  resolvedAt: string;
+};
+
+export type PlacementOutcomeReplay = {
+  kind: "replay";
+  originalOutcome: "applied" | "occupied";
+};
+
+export type PlacementOutcomeMismatch = {
+  kind: "mismatch";
+  conflictCode: "placement_command_payload_mismatch";
+};
+
+export type PlacementOutcomeDeterministicConflict = {
+  kind: "deterministic_conflict";
+  conflictCode: "placement_conflict_idempotent";
+  winner: PlacementConflictWinner;
+};
+
+export type PlacementOutcomeApplied = {
+  kind: "applied";
+};
+
+export type PlacementDeterministicOutcome =
+  | PlacementOutcomeApplied
+  | PlacementOutcomeReplay
+  | PlacementOutcomeMismatch
+  | PlacementOutcomeDeterministicConflict;

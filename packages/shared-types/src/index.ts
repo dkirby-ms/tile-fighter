@@ -47,7 +47,14 @@ export interface ReadinessReport {
   };
 }
 
+export type TilePlaceCommandId = string;
+
+export const TILE_PLACE_COMMAND_ID_MIN_LENGTH = 16;
+export const TILE_PLACE_COMMAND_ID_MAX_LENGTH = 128;
+export const TILE_PLACE_COMMAND_ID_PATTERN = "^[A-Za-z0-9_-]+$";
+
 export interface TilePlaceCommand {
+  commandId: TilePlaceCommandId;
   regionId: string;
   cellX: number;
   cellY: number;
@@ -83,6 +90,25 @@ export type TilePlaceResult =
   | {
       ok: false;
       reason: "occupied";
+      conflictCode: "placement_conflict_idempotent";
+      commandId: TilePlaceCommandId;
+      regionId: string;
+      cell: {
+        cellX: number;
+        cellY: number;
+      };
+      winner: {
+        ownerId: string;
+        tileId: number;
+        resolvedAt: string;
+      };
+    }
+  | {
+      ok: false;
+      reason: "command_payload_mismatch";
+      conflictCode: "placement_command_payload_mismatch";
+      commandId: TilePlaceCommandId;
+      regionId: string;
     }
   | {
       ok: false;

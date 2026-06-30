@@ -159,6 +159,62 @@ export class TelemetrySink {
   }
 
   /**
+   * Emit placement_conflict_detected when a coordinate conflict is observed.
+   */
+  async emitPlacementConflictDetected(input: {
+    regionId: string;
+    commandId: string;
+    actorId: string;
+    cellX: number;
+    cellY: number;
+    winnerOwnerId: string | null;
+    winnerTileId: number | null;
+  }): Promise<void> {
+    await this.emit("placement_conflict_detected", {
+      region_id: input.regionId,
+      command_id: input.commandId,
+      actor_id: input.actorId,
+      owner_id: input.actorId,
+      cell_x: input.cellX,
+      cell_y: input.cellY,
+      winner_owner_id: input.winnerOwnerId,
+      winner_tile_id: input.winnerTileId,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  /**
+   * Emit placement_conflict_resolved with deterministic conflict outcome details.
+   */
+  async emitPlacementConflictResolved(input: {
+    regionId: string;
+    commandId: string;
+    actorId: string;
+    cellX: number;
+    cellY: number;
+    outcome: "occupied";
+    replayed: boolean;
+    winnerOwnerId: string;
+    winnerTileId: number;
+    winnerResolvedAt: string;
+  }): Promise<void> {
+    await this.emit("placement_conflict_resolved", {
+      region_id: input.regionId,
+      command_id: input.commandId,
+      actor_id: input.actorId,
+      owner_id: input.actorId,
+      cell_x: input.cellX,
+      cell_y: input.cellY,
+      outcome: input.outcome,
+      replayed: input.replayed,
+      winner_owner_id: input.winnerOwnerId,
+      winner_tile_id: input.winnerTileId,
+      winner_resolved_at: input.winnerResolvedAt,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  /**
    * Emit tile_edited event for story-level bounded edit success.
    */
   async emitTileEdited(

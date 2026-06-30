@@ -16,6 +16,8 @@ export default defineConfig({
   test: {
     root: rootDir,
     environment: "node",
-    include: ["tests/**/*.{test,spec}.?(c|m)[jt]s?(x)", "tests/load/**/*.ts"]
+    fileParallelism: false,
+    include: ["tests/**/*.{test,spec}.?(c|m)[jt]s?(x)", "tests/load/**/*.ts"],
+    globalSetup: ["vitest.global-setup.ts"]
   }
 });
