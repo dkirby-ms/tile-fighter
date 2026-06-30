@@ -28,9 +28,10 @@ export type TileConflictError = {
 
 /**
  * Result type for insert operation - union of success and conflict cases
+ * sequenceId (region version) is included on success for fanout coordination
  */
 export type InsertTileResult =
-  | { ok: true; tile: { id: number; createdAt: Date } }
+  | { ok: true; tile: { id: number; createdAt: Date; sequenceId: number } }
   | { ok: false; reason: "coordinate_conflict"; error: TileConflictError };
 
 /**
@@ -131,6 +132,7 @@ export class TileRepository implements ITileRepository {
   /**
    * Insert a tile with deterministic conflict error handling
    * Maps SQLSTATE 23505 (unique violation) to coordinate_conflict result
+   * Returns sequenceId (region version) for fanout coordination
    */
   async insertTile(
     db: Kysely<ServerDatabase>,
@@ -154,14 +156,15 @@ export class TileRepository implements ITileRepository {
           .returningAll()
           .executeTakeFirstOrThrow();
 
+        let sequenceId = 0;
         if (this.canPersistRegionDiff(trx)) {
-          const nextVersion = await this.bumpRegionVersion(trx, input.regionId);
+          sequenceId = await this.bumpRegionVersion(trx, input.regionId);
 
           await trx
             .insertInto("tile_deltas")
             .values({
               region_id: input.regionId,
-              version: String(nextVersion),
+              version: String(sequenceId),
               cell_x: input.cellX,
               cell_y: input.cellY,
               operation: "upsert",
@@ -175,14 +178,15 @@ export class TileRepository implements ITileRepository {
             .executeTakeFirst();
         }
 
-        return insertedTile;
+        return { insertedTile, sequenceId };
       });
 
       return {
         ok: true,
         tile: {
-          id: result.id,
-          createdAt: result.created_at
+          id: result.insertedTile.id,
+          createdAt: result.insertedTile.created_at,
+          sequenceId: result.sequenceId
         }
       };
     } catch (error) {

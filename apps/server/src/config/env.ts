@@ -33,7 +33,11 @@ const envSchema = z.object({
   TILE_PLACE_THROTTLE_TTL_MS: z.coerce.number().int().positive().default(24 * 60 * 60 * 1000),
   REGION_DIFF_DEFAULT_MAX_TILES: z.coerce.number().int().positive().default(500),
   REGION_DIFF_MAX_TILES_PER_REQUEST: z.coerce.number().int().positive().default(1_000),
-  REGION_DIFF_MAX_VIEWPORT_AREA: z.coerce.number().int().positive().default(10_000)
+  REGION_DIFF_MAX_VIEWPORT_AREA: z.coerce.number().int().positive().default(10_000),
+  DELTA_ACK_TIMEOUT_MS: z.coerce.number().int().positive().default(350),
+  DELTA_RETRANSMIT_MAX_ATTEMPTS: z.coerce.number().int().positive().default(1),
+  DELTA_ACK_PENDING_TTL_MS: z.coerce.number().int().positive().default(30_000),
+  DELTA_OUTBOUND_CAP_PER_CONNECTION: z.coerce.number().int().positive().default(128)
 });
 
 export type RuntimeConfig = {
@@ -63,6 +67,10 @@ export type RuntimeConfig = {
   regionDiffDefaultMaxTiles: number;
   regionDiffMaxTilesPerRequest: number;
   regionDiffMaxViewportArea: number;
+  deltaAckTimeoutMs: number;
+  deltaRetransmitMaxAttempts: number;
+  deltaAckPendingTtlMs: number;
+  deltaOutboundCapPerConnection: number;
 };
 
 function splitCsv(input?: string): string[] {
@@ -109,6 +117,10 @@ export function readRuntimeConfig(): RuntimeConfig {
     tilePlaceThrottleTtlMs: parsed.TILE_PLACE_THROTTLE_TTL_MS,
     regionDiffDefaultMaxTiles: parsed.REGION_DIFF_DEFAULT_MAX_TILES,
     regionDiffMaxTilesPerRequest: parsed.REGION_DIFF_MAX_TILES_PER_REQUEST,
-    regionDiffMaxViewportArea: parsed.REGION_DIFF_MAX_VIEWPORT_AREA
+    regionDiffMaxViewportArea: parsed.REGION_DIFF_MAX_VIEWPORT_AREA,
+    deltaAckTimeoutMs: parsed.DELTA_ACK_TIMEOUT_MS,
+    deltaRetransmitMaxAttempts: parsed.DELTA_RETRANSMIT_MAX_ATTEMPTS,
+    deltaAckPendingTtlMs: parsed.DELTA_ACK_PENDING_TTL_MS,
+    deltaOutboundCapPerConnection: parsed.DELTA_OUTBOUND_CAP_PER_CONNECTION
   };
 }

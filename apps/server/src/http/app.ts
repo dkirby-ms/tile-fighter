@@ -16,6 +16,13 @@ import { RegionSnapshotService } from "../domain/region-snapshot.service.js";
 import { RegionDiffService } from "../domain/region-diff.service.js";
 import { DEFAULT_REGION_DIFF_POLICY } from "@game/shared-types";
 import { SessionCheckpointService } from "../session/session-checkpoint.service.js";
+import { DeltaFanoutCoordinator, type DeltaFanoutConfig } from "../domain/delta-fanout.service.js";
+
+/**
+ * Registry for room-scoped delta fanout coordinators indexed by regionId
+ * Allows HTTP layer and rooms to coordinate fanout dispatch
+ */
+export type DeltaFanoutRegistry = Map<string, DeltaFanoutCoordinator>;
 
 export type HttpAppDependencies = {
   readinessCheck: () => Promise<ReadinessReport>;
@@ -28,6 +35,8 @@ export type HttpAppDependencies = {
   tileRepository?: ITileRepository;
   regionSnapshotService?: RegionSnapshotService;
   regionDiffService?: RegionDiffService;
+  deltaFanoutRegistry?: DeltaFanoutRegistry;
+  deltaFanoutConfig?: DeltaFanoutConfig;
   tilePlaceThrottlePolicy?: {
     maxRequests: number;
     windowMs: number;
@@ -150,6 +159,38 @@ export function createHttpApp(dependencies: HttpAppDependencies) {
             input.cellY,
             input.ownerId
           );
+
+          // Dispatch fanout to subscribers in this region after successful commit
+          if (dependencies.deltaFanoutRegistry && result.tile.sequenceId) {
+            const coordinator = dependencies.deltaFanoutRegistry.get(input.regionId);
+            if (coordinator) {
+              // Prepare delta payload for realtime fanout
+              const deltaPayload = {
+                sequenceId: String(result.tile.sequenceId),
+                regionId: input.regionId,
+                cellX: input.cellX,
+                cellY: input.cellY,
+                offsetX: input.offsetX,
+                offsetY: input.offsetY,
+                shape: input.shape,
+                color: input.color,
+                stylePayload: input.stylePayload,
+                ownerId: input.ownerId,
+                sentAt: new Date().toISOString(),
+                retransmitAttempt: 0
+              };
+
+              // Dispatch to all subscribers in this coordinator's registry
+              // Note: coordinator maintains its own subscriber set managed by room lifecycle
+              await coordinator.publish(
+                new Set(), // Empty set - coordinator will send to all tracked subscribers
+                deltaPayload,
+                async () => {
+                  // onSend callback - actual sending is handled by room
+                }
+              );
+            }
+          }
 
           return {
             ok: true as const,

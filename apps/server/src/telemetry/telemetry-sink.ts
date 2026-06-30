@@ -277,4 +277,79 @@ export class TelemetrySink {
       timestamp: new Date().toISOString()
     });
   }
+
+  /**
+   * Emit delta_sent event when a delta is dispatched to a subscriber
+   * @param roomId - The arena room ID
+   * @param sessionId - The subscriber's session ID
+   * @param sequenceId - The delta sequence ID (region version)
+   * @param regionId - The region ID
+   * @param retransmitAttempt - The retransmit attempt number (0 for initial send)
+   */
+  async emitDeltaSent(
+    roomId: string,
+    sessionId: string,
+    sequenceId: string,
+    regionId: string,
+    retransmitAttempt: number
+  ): Promise<void> {
+    await this.emit("delta_sent", {
+      room_id: roomId,
+      session_id: sessionId,
+      sequence_id: sequenceId,
+      region_id: regionId,
+      retransmit_attempt: retransmitAttempt,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  /**
+   * Emit delta_acked event when a subscriber acknowledges receipt of a delta
+   * @param roomId - The arena room ID
+   * @param sessionId - The subscriber's session ID
+   * @param sequenceId - The delta sequence ID being acknowledged
+   * @param regionId - The region ID
+   */
+  async emitDeltaAcked(
+    roomId: string,
+    sessionId: string,
+    sequenceId: string,
+    regionId: string
+  ): Promise<void> {
+    await this.emit("delta_acked", {
+      room_id: roomId,
+      session_id: sessionId,
+      sequence_id: sequenceId,
+      region_id: regionId,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  /**
+   * Emit delta_retransmitted event when a delta is retransmitted due to ack timeout
+   * @param roomId - The arena room ID
+   * @param sessionId - The subscriber's session ID
+   * @param sequenceId - The delta sequence ID being retransmitted
+   * @param regionId - The region ID
+   * @param retransmitAttempt - The retransmit attempt number
+   * @param timeoutReasonMs - The timeout value in milliseconds that triggered retransmit
+   */
+  async emitDeltaRetransmitted(
+    roomId: string,
+    sessionId: string,
+    sequenceId: string,
+    regionId: string,
+    retransmitAttempt: number,
+    timeoutReasonMs: number
+  ): Promise<void> {
+    await this.emit("delta_retransmitted", {
+      room_id: roomId,
+      session_id: sessionId,
+      sequence_id: sequenceId,
+      region_id: regionId,
+      retransmit_attempt: retransmitAttempt,
+      timeout_reason_ms: timeoutReasonMs,
+      timestamp: new Date().toISOString()
+    });
+  }
 }
