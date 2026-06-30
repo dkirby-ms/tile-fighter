@@ -3,11 +3,13 @@ import { TelemetrySink } from "../../telemetry/telemetry-sink.js";
 import { AuthService } from "../../auth/auth-service.js";
 import { SessionLifecycleService } from "../../session/session-lifecycle.service.js";
 import { ArenaRoom } from "../../rooms/arena.room.js";
+import { SessionCheckpointService } from "../../session/session-checkpoint.service.js";
 
 export type SessionRoutesDependencies = {
   telemetrySink: TelemetrySink;
   authService: AuthService;
   lifecycleService: SessionLifecycleService;
+  checkpointService: SessionCheckpointService;
 };
 
 type RateWindow = {
@@ -19,6 +21,8 @@ const BOOTSTRAP_RATE_LIMIT_WINDOW_MS = 60_000;
 const BOOTSTRAP_RATE_LIMIT_MAX = 10;
 const HEARTBEAT_RATE_LIMIT_WINDOW_MS = 10_000;
 const HEARTBEAT_RATE_LIMIT_MAX = 30;
+const RECONNECT_RATE_LIMIT_WINDOW_MS = 60_000;
+const RECONNECT_RATE_LIMIT_MAX = 10;
 
 function isRateLimited(
   windows: Map<string, RateWindow>,
@@ -46,6 +50,7 @@ export function createSessionRoutes(dependencies: SessionRoutesDependencies): Ro
   const router = Router();
   const bootstrapWindowsBySubjectIp = new Map<string, RateWindow>();
   const heartbeatWindowsBySubject = new Map<string, RateWindow>();
+  const reconnectWindowsBySession = new Map<string, RateWindow>();
 
   router.get("/api/session/bootstrap", async (req, res) => {
     const principal = res.locals.principal;
@@ -159,7 +164,85 @@ export function createSessionRoutes(dependencies: SessionRoutesDependencies): Ro
     }
 
     dependencies.lifecycleService.noteHeartbeat(principal.tenantScopedSubject, roomId);
-    res.status(202).json({ accepted: true, roomId });
+
+    const reconnectToken = await dependencies.checkpointService.issueReconnectTokenForSubject(
+      principal.tenantScopedSubject,
+      roomId
+    );
+
+    res.status(202).json({ accepted: true, roomId, reconnectToken });
+  });
+
+  router.post("/api/session/reconnect", async (req, res) => {
+    const principal = res.locals.principal;
+    const roomId = typeof req.body?.roomId === "string" ? req.body.roomId.trim() : "";
+    const reconnectToken =
+      typeof req.body?.reconnectToken === "string" ? req.body.reconnectToken.trim() : "";
+
+    if (!roomId || !reconnectToken) {
+      res.status(400).json({ error: "roomId and reconnectToken are required" });
+      return;
+    }
+
+    const resolveResult = await dependencies.checkpointService.resolveReconnect(
+      reconnectToken,
+      principal.tenantScopedSubject,
+      roomId
+    );
+
+    if (!resolveResult.ok) {
+      const reasonToStatus: Record<string, number> = {
+        invalid_signature: 401,
+        token_expired: 401,
+        token_replay_detected: 403,
+        checkpoint_not_found: 404,
+        checkpoint_archived: 410,
+        grace_period_expired: 410,
+        stale_token: 410,
+        subject_mismatch: 403,
+        room_mismatch: 403
+      };
+
+      await dependencies.telemetrySink.emit("room_rejoin_failed", {
+        tenantScopedSubject: principal.tenantScopedSubject,
+        roomId,
+        sessionId: null,
+        reason: resolveResult.reason
+      });
+
+      res.status(reasonToStatus[resolveResult.reason] ?? 400).json({ error: resolveResult.reason });
+      return;
+    }
+
+    if (
+      isRateLimited(
+        reconnectWindowsBySession,
+        resolveResult.sessionId,
+        Date.now(),
+        RECONNECT_RATE_LIMIT_WINDOW_MS,
+        RECONNECT_RATE_LIMIT_MAX
+      )
+    ) {
+      res.status(429).json({ error: "Reconnect rate limit exceeded" });
+      return;
+    }
+
+    res.status(200).json({
+      ok: true,
+      roomId: resolveResult.roomId,
+      sessionId: resolveResult.sessionId,
+      checkpointId: resolveResult.checkpointId,
+      replay: {
+        sinceVersion: resolveResult.sinceVersion,
+        currentVersion: resolveResult.currentVersion,
+        deltaCount: resolveResult.deltaCount,
+        deltas: resolveResult.deltas
+      },
+      checksum: {
+        scope: resolveResult.checksumScope,
+        serverChecksum: resolveResult.serverChecksum
+      }
+    });
   });
 
   return router;

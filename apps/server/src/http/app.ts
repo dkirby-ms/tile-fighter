@@ -15,6 +15,7 @@ import { ITileRepository } from "../persistence/tile.repository.js";
 import { RegionSnapshotService } from "../domain/region-snapshot.service.js";
 import { RegionDiffService } from "../domain/region-diff.service.js";
 import { DEFAULT_REGION_DIFF_POLICY } from "@game/shared-types";
+import { SessionCheckpointService } from "../session/session-checkpoint.service.js";
 
 export type HttpAppDependencies = {
   readinessCheck: () => Promise<ReadinessReport>;
@@ -22,6 +23,7 @@ export type HttpAppDependencies = {
   telemetrySink: TelemetrySink;
   authService: AuthService;
   lifecycleService: SessionLifecycleService;
+  checkpointService: SessionCheckpointService;
   db?: Kysely<ServerDatabase>;
   tileRepository?: ITileRepository;
   regionSnapshotService?: RegionSnapshotService;
@@ -245,7 +247,8 @@ export function createHttpApp(dependencies: HttpAppDependencies) {
     createSessionRoutes({
       telemetrySink: dependencies.telemetrySink,
       authService: dependencies.authService,
-      lifecycleService: dependencies.lifecycleService
+      lifecycleService: dependencies.lifecycleService,
+      checkpointService: dependencies.checkpointService
     })
   );
 

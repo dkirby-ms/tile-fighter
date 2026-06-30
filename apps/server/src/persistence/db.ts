@@ -66,6 +66,24 @@ type TileDeltasTable = {
   style_payload: unknown | null;
   owner_id: string | null;
   changed_at: Date;
+  ttl_expires_at: Date | null;
+};
+
+type SessionCheckpointsTable = {
+  checkpoint_id: string;
+  player_identity: string;
+  region_id: string;
+  session_id: string;
+  room_id: string;
+  created_at: Date;
+  updated_at: Date;
+  last_confirmed_version: string;
+  client_checksum: string | null;
+  server_checksum: string | null;
+  stale: boolean;
+  stale_since_at: Date | null;
+  grace_expires_at: Date | null;
+  archived_at: Date | null;
 };
 
 export type ServerDatabase = {
@@ -75,6 +93,7 @@ export type ServerDatabase = {
   region_snapshot_tiles: RegionSnapshotTilesTable;
   region_versions: RegionVersionsTable;
   tile_deltas: TileDeltasTable;
+  session_checkpoints: SessionCheckpointsTable;
 };
 
 export type TilesSelect = Selectable<TilesTable>;
@@ -88,6 +107,9 @@ export type RegionVersionsSelect = Selectable<RegionVersionsTable>;
 export type RegionVersionsInsert = Insertable<RegionVersionsTable>;
 export type TileDeltasSelect = Selectable<TileDeltasTable>;
 export type TileDeltasInsert = Insertable<TileDeltasTable>;
+export type SessionCheckpointsSelect = Selectable<SessionCheckpointsTable>;
+export type SessionCheckpointsInsert = Insertable<SessionCheckpointsTable>;
+export type SessionCheckpointsUpdate = Updateable<SessionCheckpointsTable>;
 
 export type DatabaseRuntime = {
   db: Kysely<ServerDatabase>;

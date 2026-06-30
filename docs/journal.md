@@ -25,6 +25,9 @@ First we will brainstorm and build our idea into a design document. We can works
     - Use your own judgement. Carefully review the planning artifact to be sure that it makes sense. For example, in my first epic, it wasnt aligned to Colyseus and would have built custom session connection management instead of using Colyseus. This was corrected after a second pass of the plan. It also didnt consider that we were planning to use Entra external identities for auth. I steered it to update the first task for both of these platform dependencies. Note that I had preselected this architecture based on other experience, but its perfectly valid to workshop both of these choices also and reach different conclusions.
     - Identified another gap, no entra client side auth flow available means no way to get an actual entra token without tedious direct API calls and token manipulation. Sent Task Researcher and planner back to identify gaps and then backlog manager to update issues to reflect missing clientside logic.
 1. Continued to epic 2, which required an additional DT session to workshop the tile placement and persistence strategy. I didnt think it was well thought out enough to allow the amount of artistic freedom in placing tiles that I wanted after the first pass, so used DT Coach to workshop the idea some more and made adjustments to the researched plan.
+1. Merged epic 2 after PR review pass and fixes and some minor fixes to CI (db was missing from GH runner workflow).
+1. Began research, planning, imp on E3.
+1. Noticed Release workflows not configured for GH OIDC (expected Azure SPN and secret). Deployed RPI agent to fix.
 
 ### CI/CD Harness
 

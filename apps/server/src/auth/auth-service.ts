@@ -2,10 +2,12 @@ import { JwtValidationConfig, JwtValidator } from "@game/shared-auth";
 import { AuthenticatedPrincipal } from "@game/shared-types";
 import { RuntimeConfig } from "../config/env.js";
 import { JoinTokenService, JoinTokenPayload } from "./join-token.service.js";
+import { ReconnectTokenPayload, ReconnectTokenService } from "./reconnect-token.service.js";
 
 export class AuthService {
   private readonly validator: JwtValidator;
   private readonly joinTokenService: JoinTokenService;
+  private readonly reconnectTokenService: ReconnectTokenService;
 
   constructor(config: RuntimeConfig) {
     const validatorConfig: JwtValidationConfig = {
@@ -26,6 +28,10 @@ export class AuthService {
       signingSecret: config.joinTokenSigningSecret,
       ttlSeconds: config.joinTokenTtlSeconds
     });
+    this.reconnectTokenService = new ReconnectTokenService({
+      signingSecret: config.joinTokenSigningSecret,
+      ttlSeconds: config.joinTokenTtlSeconds
+    });
   }
 
   async verifyAccessToken(token: string): Promise<AuthenticatedPrincipal> {
@@ -41,5 +47,13 @@ export class AuthService {
 
   verifyJoinToken(token: string, expectedRoomId: string): JoinTokenPayload {
     return this.joinTokenService.verify(token, expectedRoomId);
+  }
+
+  issueReconnectToken(payload: Omit<ReconnectTokenPayload, "exp" | "jti">): string {
+    return this.reconnectTokenService.issue(payload);
+  }
+
+  verifyReconnectToken(token: string): ReconnectTokenPayload {
+    return this.reconnectTokenService.verify(token);
   }
 }
