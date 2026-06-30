@@ -66,6 +66,9 @@ jobs:
           echo "PostgreSQL did not become ready in time"
           exit 1
 
+      - name: Apply database migrations
+        run: npm run -w @game/server migrate:up
+
       - name: Test
         run: npm run test
 
