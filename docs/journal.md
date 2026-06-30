@@ -28,6 +28,9 @@ First we will brainstorm and build our idea into a design document. We can works
 1. Merged epic 2 after PR review pass and fixes and some minor fixes to CI (db was missing from GH runner workflow).
 1. Began research, planning, imp on E3.
 1. Noticed Release workflows not configured for GH OIDC (expected Azure SPN and secret). Deployed RPI agent to fix.
+1. RPI through Epic 3. 
+1. Azure deployment IaC missing, new issue created and RPI'd.
+1. RPI Epic 4 and 5 in parallel.
 
 ### CI/CD Harness
 
