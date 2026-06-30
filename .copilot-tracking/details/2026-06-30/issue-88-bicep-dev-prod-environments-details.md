@@ -265,33 +265,403 @@ Context references:
 Dependencies:
 * No code dependencies; can run in parallel with Phases 2 and 3
 
-## Implementation Phase 5: Validation
+## Implementation Phase 5: Create environment.bicep and bicepparam files
 
 <!-- parallelizable: false -->
 
-### Step 5.1: Run full Bicep compilation
+### Step 5.1: Create apps/server/infra/containerapps/bicep/environment.bicep
+
+Create a new shared Bicep template that provisions:
+- A `Microsoft.OperationalInsights/workspaces` (Log Analytics workspace) — required dependency for the managed environment
+- A `Microsoft.App/managedEnvironments` — uses the workspace `customerId` and `listKeys()` for log ingestion; declares an explicit `Consumption` workload profile to match the `workloadProfileName = 'Consumption'` in `main.bicep`
+
+Files:
+* `apps/server/infra/containerapps/bicep/environment.bicep` — **create new**
+
+Full content:
+
+```bicep
+metadata name = 'tile-fighter-aca-environment'
+metadata description = 'Provisions Log Analytics workspace and Azure Container Apps managed environment.'
+
+targetScope = 'resourceGroup'
+
+@description('Azure region for resources.')
+param location string = resourceGroup().location
+
+@description('Log Analytics workspace name.')
+param logAnalyticsWorkspaceName string
+
+@description('Container Apps managed environment name.')
+param managedEnvironmentName string
+
+resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2022-10-01' = {
+  name: logAnalyticsWorkspaceName
+  location: location
+  properties: {
+    retentionInDays: 30
+    sku: {
+      name: 'PerGB2018'
+    }
+  }
+}
+
+resource managedEnvironment 'Microsoft.App/managedEnvironments@2024-03-01' = {
+  name: managedEnvironmentName
+  location: location
+  properties: {
+    appLogsConfiguration: {
+      destination: 'log-analytics'
+      logAnalyticsConfiguration: {
+        customerId: logAnalytics.properties.customerId
+        sharedKey: logAnalytics.listKeys().primarySharedKey
+      }
+    }
+    workloadProfiles: [
+      {
+        name: 'Consumption'
+        workloadProfileType: 'Consumption'
+      }
+    ]
+  }
+}
+
+output managedEnvironmentId string = managedEnvironment.id
+output managedEnvironmentName string = managedEnvironment.name
+```
+
+Success criteria:
+* File exists at the correct path
+* `az bicep build --file apps/server/infra/containerapps/bicep/environment.bicep` exits 0
+
+Context references:
+* `.copilot-tracking/research/subagents/2026-06-30/aca-environment-provisioning-research.md` — required resources and naming conventions
+* `apps/server/infra/containerapps/bicep/main.bicep` (Line 64) — `workloadProfileName: 'Consumption'` must match
+
+Dependencies:
+* None
+
+### Step 5.2: Create apps/server/infra/containerapps/bicep/environment.dev.bicepparam
+
+Files:
+* `apps/server/infra/containerapps/bicep/environment.dev.bicepparam` — **create new**
+
+Full content:
+
+```bicep
+using './environment.bicep'
+
+param logAnalyticsWorkspaceName = 'log-tile-fighter-dev'
+param managedEnvironmentName = 'aca-env-dev'
+```
+
+`managedEnvironmentName` matches the value in `main.dev.bicepparam` so the precheck in `release-dev.yml` resolves to the same resource.
+
+Success criteria:
+* File exists and references `aca-env-dev` consistent with `main.dev.bicepparam`
+* `az bicep build-params --file apps/server/infra/containerapps/bicep/environment.dev.bicepparam` exits 0
+
+Context references:
+* `apps/server/infra/containerapps/bicep/main.dev.bicepparam` (Line 3) — `managedEnvironmentName = 'aca-env-dev'`
+
+Dependencies:
+* Step 5.1 completion
+
+### Step 5.3: Create apps/server/infra/containerapps/bicep/environment.prod.bicepparam
+
+Files:
+* `apps/server/infra/containerapps/bicep/environment.prod.bicepparam` — **create new**
+
+Full content:
+
+```bicep
+using './environment.bicep'
+
+param logAnalyticsWorkspaceName = 'log-tile-fighter-prod'
+param managedEnvironmentName = 'aca-env-prod'
+```
+
+Success criteria:
+* File exists and references `aca-env-prod` consistent with `main.prod.bicepparam`
+* `az bicep build-params --file apps/server/infra/containerapps/bicep/environment.prod.bicepparam` exits 0
+
+Context references:
+* `apps/server/infra/containerapps/bicep/main.prod.bicepparam` (Line 3) — `managedEnvironmentName = 'aca-env-prod'`
+
+Dependencies:
+* Step 5.1 completion
+
+### Step 5.4: Validate phase changes
+
+```bash
+az bicep build --file apps/server/infra/containerapps/bicep/environment.bicep
+az bicep build-params --file apps/server/infra/containerapps/bicep/environment.dev.bicepparam
+az bicep build-params --file apps/server/infra/containerapps/bicep/environment.prod.bicepparam
+```
+
+## Implementation Phase 6: Create provision-env-dev.yml workflow
+
+<!-- parallelizable: true -->
+
+### Step 6.1: Create .github/workflows/provision-env-dev.yml
+
+The provisioning workflow is intentionally simpler than the release workflows: no image build, no vulnerability scan, no immutable artifact. It only authenticates to Azure and deploys the environment Bicep.
+
+Files:
+* `.github/workflows/provision-env-dev.yml` — **create new**
+
+Full content:
+
+```yaml
+name: Provision Environment Dev
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  provision-env-dev:
+    name: Provision dev managed environment
+    runs-on: ubuntu-latest
+    environment: dev
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate required provisioning inputs
+        env:
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          AZURE_RESOURCE_GROUP: ${{ secrets.AZURE_RESOURCE_GROUP }}
+        run: |
+          set -euo pipefail
+          required=(
+            AZURE_CLIENT_ID
+            AZURE_TENANT_ID
+            AZURE_SUBSCRIPTION_ID
+            AZURE_RESOURCE_GROUP
+          )
+          for key in "${required[@]}"; do
+            if [[ -z "${!key:-}" ]]; then
+              echo "Missing required secret: $key" >&2
+              exit 1
+            fi
+          done
+
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy environment infrastructure
+        env:
+          AZURE_RESOURCE_GROUP: ${{ secrets.AZURE_RESOURCE_GROUP }}
+        run: |
+          set -euo pipefail
+          az deployment group create \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
+            --template-file apps/server/infra/containerapps/bicep/environment.bicep \
+            --parameters @apps/server/infra/containerapps/bicep/environment.dev.bicepparam
+```
+
+Success criteria:
+* File exists with `workflow_dispatch` as the only trigger
+* Workflow uses only the four OIDC secrets (`AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`, `AZURE_RESOURCE_GROUP`)
+* YAML is syntactically valid
+
+Context references:
+* `.github/workflows/release-dev.yml` (Lines 1-65) — authentication and validate-step pattern to mirror
+* `.copilot-tracking/research/subagents/2026-06-30/aca-environment-provisioning-research.md` — workflow trigger strategy
+
+Dependencies:
+* Phase 5 completion (Bicep files must exist before they can be referenced)
+
+## Implementation Phase 7: Create provision-env-prod.yml workflow
+
+<!-- parallelizable: true -->
+
+### Step 7.1: Create .github/workflows/provision-env-prod.yml
+
+Structurally identical to Phase 6 but targets the `prod` GitHub environment and `environment.prod.bicepparam`.
+
+Files:
+* `.github/workflows/provision-env-prod.yml` — **create new**
+
+Full content:
+
+```yaml
+name: Provision Environment Prod
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  provision-env-prod:
+    name: Provision prod managed environment
+    runs-on: ubuntu-latest
+    environment: prod
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate required provisioning inputs
+        env:
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          AZURE_RESOURCE_GROUP: ${{ secrets.AZURE_RESOURCE_GROUP }}
+        run: |
+          set -euo pipefail
+          required=(
+            AZURE_CLIENT_ID
+            AZURE_TENANT_ID
+            AZURE_SUBSCRIPTION_ID
+            AZURE_RESOURCE_GROUP
+          )
+          for key in "${required[@]}"; do
+            if [[ -z "${!key:-}" ]]; then
+              echo "Missing required secret: $key" >&2
+              exit 1
+            fi
+          done
+
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy environment infrastructure
+        env:
+          AZURE_RESOURCE_GROUP: ${{ secrets.AZURE_RESOURCE_GROUP }}
+        run: |
+          set -euo pipefail
+          az deployment group create \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
+            --template-file apps/server/infra/containerapps/bicep/environment.bicep \
+            --parameters @apps/server/infra/containerapps/bicep/environment.prod.bicepparam
+```
+
+Success criteria:
+* File exists with `workflow_dispatch` as the only trigger
+* Workflow targets `environment: prod` and uses `environment.prod.bicepparam`
+* YAML is syntactically valid
+
+Context references:
+* `.github/workflows/release-prod.yml` (Lines 1-40) — `workflow_dispatch`-only trigger pattern
+
+Dependencies:
+* Phase 5 completion
+
+## Implementation Phase 8: Add Environment Provisioning section to docs/cicd-harness.md
+
+<!-- parallelizable: true -->
+
+### Step 8.1: Add Environment Provisioning section to cicd-harness.md
+
+Append a new "Environment Provisioning" section after the existing "Bicep Parameter Contract" section. The section must explain the decoupling rationale, list the new files, document the `workflow_dispatch`-only trigger, and note RBAC requirements.
+
+Files:
+* `docs/cicd-harness.md` — add new section after "Bicep Parameter Contract" section (currently around line 130)
+
+Content to add:
+
+```markdown
+## Environment Provisioning
+
+The managed environment layer is decoupled from the container app deployment layer. Run it once per environment before the first release workflow execution, or to repair environment drift.
+
+### Files
+
+- Template: `apps/server/infra/containerapps/bicep/environment.bicep`
+- Dev parameters: `apps/server/infra/containerapps/bicep/environment.dev.bicepparam`
+- Prod parameters: `apps/server/infra/containerapps/bicep/environment.prod.bicepparam`
+
+### Provisioned Resources
+
+| Resource | Dev | Prod |
+| --- | --- | --- |
+| Log Analytics workspace | `log-tile-fighter-dev` | `log-tile-fighter-prod` |
+| Container Apps managed environment | `aca-env-dev` | `aca-env-prod` |
+
+The managed environment declares an explicit `Consumption` workload profile to match the `workloadProfileName = 'Consumption'` expected by `main.bicep`.
+
+### Provisioning Workflows
+
+- `provision-env-dev.yml` — `workflow_dispatch` only; targets the `dev` GitHub environment
+- `provision-env-prod.yml` — `workflow_dispatch` only; targets the `prod` GitHub environment
+
+Both workflows reuse only the four OIDC secrets required for Azure login (`AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`, `AZURE_RESOURCE_GROUP`). Log Analytics keys are never passed as workflow secrets; they are read internally by Bicep via `listKeys()`.
+
+### RBAC Requirements
+
+The OIDC service principal requires `Contributor` on the deployment resource group — the same scope already granted for container app releases. No additional role assignments are needed.
+
+### Decoupling Rationale
+
+- Environment provisioning is a low-frequency, operator-initiated action; it should not run on every push.
+- The container app deployment layer (`main.bicep`, `release-dev.yml`, `release-prod.yml`) depends on the managed environment existing but does not own its lifecycle.
+- Keeping the layers separate prevents an accidental environment deletion if the app deployment Bicep is updated.
+- The "Precheck managed environment" step in both release workflows confirms the environment exists before deploying the container app; it assumes the provisioning workflow has already been run for the target environment.
+```
+
+Success criteria:
+* Section exists in `docs/cicd-harness.md` after "Bicep Parameter Contract"
+* All new file paths are correct relative to workspace root
+
+Context references:
+* `docs/cicd-harness.md` (Lines 125-135) — Bicep Parameter Contract section (insertion point)
+
+Dependencies:
+* No code dependencies; can run in parallel with Phases 6 and 7
+
+## Implementation Phase 9: Validation
+
+<!-- parallelizable: false -->
+
+### Step 9.1: Run full Bicep compilation for all six Bicep files
 
 ```bash
 az bicep build --file apps/server/infra/containerapps/bicep/main.bicep
+az bicep build --file apps/server/infra/containerapps/bicep/environment.bicep
 az bicep build-params --file apps/server/infra/containerapps/bicep/main.dev.bicepparam
 az bicep build-params --file apps/server/infra/containerapps/bicep/main.prod.bicepparam
+az bicep build-params --file apps/server/infra/containerapps/bicep/environment.dev.bicepparam
+az bicep build-params --file apps/server/infra/containerapps/bicep/environment.prod.bicepparam
 ```
 
-### Step 5.2: Cross-check workflows against Bicep
+### Step 9.2: Cross-check release workflows against Bicep
 
-Verify that every `@secure()` parameter in `main.bicep` has a corresponding `--parameters <name>="$SECRET"` line in both `release-dev.yml` and `release-prod.yml`.
+Verify every `@secure()` parameter in `main.bicep` has a `--parameters <name>="$SECRET"` line in both `release-dev.yml` and `release-prod.yml`.
 
-### Step 5.3: Cross-check docs against workflows
+### Step 9.3: Cross-check docs against workflows
 
-Verify the Secret Naming Contract list in `docs/cicd-harness.md` matches the `required=()` array in both workflows entry for entry.
+Verify the Secret Naming Contract list in `docs/cicd-harness.md` matches the `required=()` array in both release workflows entry for entry.
 
-### Step 5.4: Fix minor validation issues
+### Step 9.4: Verify provisioning workflows
+
+Confirm provisioning workflows use `workflow_dispatch` only, reference only the four OIDC secrets, and pass the correct `bicepparam` file.
+
+### Step 9.5: Fix minor validation issues
 
 Apply any lint or formatting corrections inline.
 
-### Step 5.5: Report blocking issues
+### Step 9.6: Report blocking issues
 
-Document any failures that require additional research and provide next steps without attempting large-scale inline fixes.
+Document any failures requiring additional research and provide next steps without attempting large-scale inline fixes.
 
 ## Dependencies
 
@@ -299,6 +669,8 @@ Document any failures that require additional research and provide next steps wi
 
 ## Success Criteria
 
-* All three Bicep files compile without error
+* All six Bicep files compile without error
 * Both release workflows fail fast on missing `JOIN_TOKEN_SIGNING_SECRET`
 * `docs/cicd-harness.md` Secret Naming Contract is in sync with actual workflow required arrays
+* Provisioning workflows exist, are `workflow_dispatch`-only, and correctly reference environment Bicep files
+

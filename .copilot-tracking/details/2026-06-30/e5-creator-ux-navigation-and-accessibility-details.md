@@ -56,7 +56,27 @@ Dependencies:
 * Step 1.1 completion
 * Existing replay and realtime delta helpers in apps/client/src/session
 
-### Step 1.3: Validate phase changes
+### Step 1.3: Add creator tool and preview telemetry
+
+Instrument the E5-S1 telemetry surfaces directly in the creator-session and tool-state flow. Emit `palette_opened`, `shape_selected`, `color_selected`, and `placement_preview_shown` from the new creator modules so the backlog acceptance and analytics expectations are met alongside preview behavior.
+
+Files:
+* apps/client/src/creator/creator-session.ts - Emits creator-flow interaction events at the orchestration boundary.
+* apps/client/src/creator/tool-state.ts - Exposes deterministic state transitions that telemetry hooks can observe without duplicating business logic.
+* apps/client/tests/unit/tool-state.test.ts - Verifies telemetry-triggering transitions remain stable.
+* apps/client/tests/integration/creator-placement-flow.test.ts - Verifies E5-S1 telemetry emission shape and trigger points.
+
+Success criteria:
+* E5-S1 telemetry events are emitted from deterministic state transitions rather than ad hoc UI callbacks.
+* Placement preview instrumentation is covered by client tests alongside preview behavior.
+
+Context references:
+* .copilot-tracking/research/subagents/2026-06-30/e5-creator-planning-gaps-research.md (Lines 57-60) - E5-S1 telemetry requirements.
+
+Dependencies:
+* Step 1.2 completion
+
+### Step 1.4: Validate phase changes
 
 Run the client-scoped validation commands after the foundation and placement workflow land.
 
@@ -65,7 +85,7 @@ Validation commands:
 * npm run -w @game/client test - Runs new unit and integration coverage for E5-S1.
 * npm run -w @game/client build - Verifies the exported creator surface compiles.
 
-## Implementation Phase 2: Camera, zoom, and spatial culling
+## Implementation Phase 2: Camera, zoom, spatial culling, and viewport telemetry
 
 <!-- parallelizable: false -->
 
@@ -113,9 +133,38 @@ Context references:
 Dependencies:
 * Step 2.1 completion
 
+### Step 2.3: Add viewport and zoom telemetry
+
+Instrument the E5-S2 camera flow so viewport movement and zoom changes emit the backlog-defined telemetry without coupling analytics to renderer code. Keep the event hooks in camera-state or creator-session adapters where state changes are already normalized.
+
+Files:
+* apps/client/src/creator/camera-state.ts - Exposes normalized camera transitions that can produce analytics events.
+* apps/client/src/creator/creator-session.ts - Emits `viewport_changed` and `zoom_level_changed` from camera updates.
+* apps/client/tests/unit/camera-state.test.ts - Verifies telemetry-relevant transition boundaries remain deterministic.
+* apps/client/tests/integration/creator-placement-flow.test.ts - Extends coverage if creator-session owns camera event emission.
+
+Success criteria:
+* E5-S2 telemetry events fire from bounded camera transitions.
+* Camera and viewport analytics are test-covered and remain separate from rendering implementation details.
+
+Context references:
+* .copilot-tracking/research/subagents/2026-06-30/e5-creator-planning-gaps-research.md (Lines 61-64) - E5-S2 telemetry requirements.
+
+Dependencies:
+* Step 2.1 completion
+
+### Step 2.4: Validate phase changes
+
+Run the client-scoped validation commands after camera, culling, and telemetry work land.
+
+Validation commands:
+* npm run -w @game/client lint - Validates new camera and telemetry source files.
+* npm run -w @game/client test - Runs new unit and integration coverage for E5-S2.
+* npm run -w @game/client build - Verifies the camera and telemetry surfaces compile.
+
 ## Implementation Phase 3: Onboarding and first-tile telemetry
 
-<!-- parallelizable: true -->
+<!-- parallelizable: false -->
 
 ### Step 3.1: Add a skippable onboarding state machine and confirmation callout
 
@@ -124,9 +173,6 @@ Implement E5-S3 as an assistive, non-blocking overlay that can be skipped or com
 Files:
 * apps/client/src/creator/onboarding-state.ts - Defines onboarding steps, skip/completion transitions, and one-time confirmation state.
 * apps/client/tests/integration/onboarding-flow.test.ts - Verifies skip path, complete path, and one-time confirmation behavior.
-
-Discrepancy references:
-* DR-05
 
 Success criteria:
 * Onboarding can be skipped without blocking placement.
@@ -165,7 +211,7 @@ Dependencies:
 
 ## Implementation Phase 4: Accessibility controls and keyboard placement
 
-<!-- parallelizable: true -->
+<!-- parallelizable: false -->
 
 ### Step 4.1: Implement local accessibility settings and announcer primitives
 
@@ -175,9 +221,6 @@ Files:
 * apps/client/src/creator/accessibility-settings.ts - Stores reduced-motion, high-contrast, and related local accessibility toggles.
 * apps/client/src/creator/accessibility-announcer.ts - Normalizes screen-reader or status-announcement messages for placement and onboarding milestones.
 * apps/client/tests/unit/accessibility-settings.test.ts - Verifies toggle defaults, transitions, and reset behavior.
-
-Discrepancy references:
-* DD-01
 
 Success criteria:
 * Required reduced-motion and contrast settings are local, deterministic, and test-covered.
@@ -189,6 +232,7 @@ Context references:
 
 Dependencies:
 * Implementation Phase 1 completion
+* E4-S3 completion
 
 ### Step 4.2: Add keyboard-only placement flow and accessibility integration coverage
 
@@ -212,6 +256,9 @@ Context references:
 Dependencies:
 * Step 4.1 completion
 * Implementation Phase 1 completion
+* Implementation Phase 2 completion
+* Implementation Phase 3 completion
+* E4-S3 completion
 
 ## Implementation Phase 5: Validation and verification expansion
 

@@ -17,11 +17,13 @@ Implement a deterministic bonding evaluator in the shared contract layer, invoke
 * Emit `bonding_triggered` telemetry with bond type - Source: docs/layer1-backlog.md (E4-S1 telemetry requirements)
 * Validate tile attribute bounds as part of the bonding input surface - Source: docs/layer1-backlog.md (E4-S1 security and abuse checks)
 * Add unit, integration, and property-style deterministic tests for the bonding engine - Source: docs/layer1-backlog.md (E4-S1 test requirements)
+* Use the most expressive rule-specific local window for each bond type instead of a rigid adjacency-only rule - Derived from: user preference for maximum artistic freedom
 
 ### Derived Objectives
 
 * Keep E4-S1 server-authoritative so the bonding decision is made only after a successful placement commit - Derived from: .copilot-tracking/research/2026-06-30/e4-deterministic-bonding-and-task1-research.md
 * Reuse existing canonical ordering and hashing patterns to avoid nondeterministic neighborhood evaluation - Derived from: .copilot-tracking/research/2026-06-30/e4-deterministic-bonding-and-task1-research.md
+* Allow rule-specific local windows so the bond grammar can express richer shapes without revisiting the contract surface - Derived from: user preference for maximum artistic freedom
 * Limit the initial scope to server telemetry plus shared evaluator code and defer client VFX wiring to later E4 stories - Derived from: docs/layer1-backlog.md and .copilot-tracking/research/2026-06-30/e4-deterministic-bonding-and-task1-research.md
 
 ## Context Summary

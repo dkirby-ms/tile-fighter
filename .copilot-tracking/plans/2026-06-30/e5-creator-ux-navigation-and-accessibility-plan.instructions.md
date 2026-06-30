@@ -57,35 +57,41 @@ Implement Epic 5 as a creator composition layer inside apps/client that adds pla
   * Details: .copilot-tracking/details/2026-06-30/e5-creator-ux-navigation-and-accessibility-details.md (Lines 12-35)
 * [ ] Step 1.2: Implement placement preview and placement submission adapters
   * Details: .copilot-tracking/details/2026-06-30/e5-creator-ux-navigation-and-accessibility-details.md (Lines 37-57)
-* [ ] Step 1.3: Validate phase changes
+* [ ] Step 1.3: Add creator tool and preview telemetry
+  * Details: .copilot-tracking/details/2026-06-30/e5-creator-ux-navigation-and-accessibility-details.md (Lines 59-79)
+* [ ] Step 1.4: Validate phase changes
   * Run lint, test, and build commands for the @game/client workspace
 
-### [ ] Implementation Phase 2: Camera, zoom, and spatial culling
+### [ ] Implementation Phase 2: Camera, zoom, spatial culling, and viewport telemetry
 
 <!-- parallelizable: false -->
 
 * [ ] Step 2.1: Add deterministic camera state and culling utilities
-  * Details: .copilot-tracking/details/2026-06-30/e5-creator-ux-navigation-and-accessibility-details.md (Lines 72-92)
+  * Details: .copilot-tracking/details/2026-06-30/e5-creator-ux-navigation-and-accessibility-details.md (Lines 95-115)
 * [ ] Step 2.2: Add viewport diff transport only if camera state cannot remain local
-  * Details: .copilot-tracking/details/2026-06-30/e5-creator-ux-navigation-and-accessibility-details.md (Lines 94-114)
+  * Details: .copilot-tracking/details/2026-06-30/e5-creator-ux-navigation-and-accessibility-details.md (Lines 117-137)
+* [ ] Step 2.3: Add viewport and zoom telemetry
+  * Details: .copilot-tracking/details/2026-06-30/e5-creator-ux-navigation-and-accessibility-details.md (Lines 139-156)
+* [ ] Step 2.4: Validate phase changes
+  * Run lint, test, and build commands for the @game/client workspace
 
 ### [ ] Implementation Phase 3: Onboarding and first-tile telemetry
 
-<!-- parallelizable: true -->
+<!-- parallelizable: false -->
 
 * [ ] Step 3.1: Add a skippable onboarding state machine and confirmation callout
-  * Details: .copilot-tracking/details/2026-06-30/e5-creator-ux-navigation-and-accessibility-details.md (Lines 120-140)
+  * Details: .copilot-tracking/details/2026-06-30/e5-creator-ux-navigation-and-accessibility-details.md (Lines 167-187)
 * [ ] Step 3.2: Define and implement first-tile timing capture
-  * Details: .copilot-tracking/details/2026-06-30/e5-creator-ux-navigation-and-accessibility-details.md (Lines 142-164)
+  * Details: .copilot-tracking/details/2026-06-30/e5-creator-ux-navigation-and-accessibility-details.md (Lines 189-211)
 
 ### [ ] Implementation Phase 4: Accessibility controls and keyboard placement
 
-<!-- parallelizable: true -->
+<!-- parallelizable: false -->
 
 * [ ] Step 4.1: Implement local accessibility settings and announcer primitives
-  * Details: .copilot-tracking/details/2026-06-30/e5-creator-ux-navigation-and-accessibility-details.md (Lines 170-192)
+  * Details: .copilot-tracking/details/2026-06-30/e5-creator-ux-navigation-and-accessibility-details.md (Lines 217-239)
 * [ ] Step 4.2: Add keyboard-only placement flow and accessibility integration coverage
-  * Details: .copilot-tracking/details/2026-06-30/e5-creator-ux-navigation-and-accessibility-details.md (Lines 193-214)
+  * Details: .copilot-tracking/details/2026-06-30/e5-creator-ux-navigation-and-accessibility-details.md (Lines 241-265)
 
 ### [ ] Implementation Phase 5: Validation and verification expansion
 
@@ -96,7 +102,7 @@ Implement Epic 5 as a creator composition layer inside apps/client that adds pla
 * [ ] Step 5.2: Fix minor validation issues
   * Iterate on lint, build, and test failures that stay within the touched E5 slice
 * [ ] Step 5.3: Expand harness-point-6 proof or report the gap
-  * Details: .copilot-tracking/details/2026-06-30/e5-creator-ux-navigation-and-accessibility-details.md (Lines 234-254)
+  * Details: .copilot-tracking/details/2026-06-30/e5-creator-ux-navigation-and-accessibility-details.md (Lines 285-305)
 
 ## Planning Log
 

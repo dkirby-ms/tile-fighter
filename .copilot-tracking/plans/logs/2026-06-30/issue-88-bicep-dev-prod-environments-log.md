@@ -15,6 +15,26 @@
   * Reason: Issue scope is to complete the functional deployment contract, not to introduce per-environment scale differentiation. Parameterizing scale is follow-on work.
   * Impact: low (dev and prod run identical scale profiles; acceptable for current scope)
 
+* DR-03: Log Analytics retention is hardcoded at 30 days in `environment.bicep`; not parameterized
+  * Source: `.copilot-tracking/research/subagents/2026-06-30/aca-environment-provisioning-research.md` (clarifying question 1)
+  * Reason: GDD targets <$100/month which suggests short retention. A param can be added in follow-on work if environments diverge.
+  * Impact: low
+
+* DR-04: `provision-env-dev.yml` uses `workflow_dispatch` only (no paths trigger on infra changes)
+  * Source: `.copilot-tracking/research/subagents/2026-06-30/aca-environment-provisioning-research.md` (clarifying question 4)
+  * Reason: Automated provisioning on every `environment.bicep` change to `main` risks unintended environment mutations. Operator dispatch is the safer default for an initial implementation.
+  * Impact: low (provisioning is a low-frequency operation)
+
+* DR-05: Plan cross-reference line numbers for Phases 5–8 in the details file are approximately 65–70 lines too early due to a duplicate `## Implementation Phase 5` heading in the details file
+  * Source: `.copilot-tracking/details/2026-06-30/issue-88-bicep-dev-prod-environments-details.md` — two sections both titled `## Implementation Phase 5` appear sequentially: the first is `Implementation Phase 5: Validation` (an intermediate checkpoint covering only phases 1–4, with steps 5.1–5.5), and the second is `Implementation Phase 5: Create environment.bicep and bicepparam files` (the phase the plan refers to). The extra section adds approximately 28 lines between Phase 4's tail and the real Phase 5 environment.bicep content, shifting Phases 5–8 content to approximately lines 296, 369, 393, 435, 510, and 600 respectively — not the 228, 291, 311, 333, 403, and 473 that the plan cites.
+  * Reason: The details file was authored with an intermediate validation checkpoint that was given the same phase number as the subsequent environment-provisioning phase. The actual content is present and structurally correct; only the numeric cross-references in the plan are misleading.
+  * Impact: medium — an implementer navigating to the cited line numbers lands in the wrong section of the details file (Phase 4 tail + intermediate validation, not environment.bicep creation). Content is still reachable by heading search. The intermediate validation steps (validate main.bicep only, before environment.bicep exists) are also not represented in the plan checklist.
+
+* DR-06: Subagent research section 5 recommends updating the existing "Precheck managed environment" step description in `docs/cicd-harness.md` to note that the precheck is now a signal of completed provisioning rather than the only safeguard. Phase 8 Step 8.1 adds a new "Environment Provisioning" section but does not include an explicit task to revise the implied meaning of the existing precheck description.
+  * Source: `.copilot-tracking/research/subagents/2026-06-30/aca-environment-provisioning-research.md` (Section 5, item 2)
+  * Reason: The Phase 8 harness doc update focuses on adding a new section. Revising the existing description is a secondary editorial task with no functional impact.
+  * Impact: low (documentation only; no runtime or deployment consequence)
+
 ### Plan Deviations from Research
 
 * DD-01: `main.dev.bicepparam` and `main.prod.bicepparam` require no changes
@@ -24,11 +44,11 @@
 
 ## Implementation Paths Considered
 
-### Selected: Extend shared main.bicep with joinTokenSigningSecret parameter
+### Selected: Extend shared main.bicep with joinTokenSigningSecret parameter, and add decoupled environment.bicep + provisioning workflows
 
-* Approach: Add one `@secure()` parameter to `main.bicep`, add its secret entry and env injection, extend both workflows, and clean up docs.
-* Rationale: Lowest-risk path. No template duplication. Follows existing pattern already established for the five other secure params (databaseUrlSecret, entraIssuerSecret, entraAudienceSecret, entraJwksUrlSecret, entraTenantIdSecret).
-* Evidence: `.copilot-tracking/research/2026-06-30/issue-88-bicep-dev-prod-environments-research.md` (Technical Scenarios / Single Shared Module section)
+* Approach: Add one `@secure()` parameter to `main.bicep`; add a separate `environment.bicep` for the managed environment and Log Analytics workspace; create `provision-env-dev.yml` and `provision-env-prod.yml` as `workflow_dispatch`-only workflows; extend both release workflows; clean up docs.
+* Rationale: Keeps app deployment and environment lifecycle as independent concerns. No template duplication. Follows existing `main.bicep` pattern for the provisioning Bicep files.
+* Evidence: `.copilot-tracking/research/2026-06-30/issue-88-bicep-dev-prod-environments-research.md` (Technical Scenarios section); `.copilot-tracking/research/subagents/2026-06-30/aca-environment-provisioning-research.md` (Required resources and decoupling strategy)
 
 ### IP-01: Split into main.dev.bicep and main.prod.bicep
 
@@ -55,3 +75,17 @@
 * WI-03: Introduce Azure Key Vault-backed secret retrieval — Replace GitHub Environments secrets with Key Vault references for centralized secret governance (low priority)
   * Source: `docs/cicd-harness.md` Alternate model note in Secret Source of Truth section
   * Dependency: No code dependency; governance decision required first
+
+* WI-04: Add `paths:` trigger to `provision-env-dev.yml` for automatic drift correction — Trigger dev environment provisioning when `environment.bicep` or `environment.dev.bicepparam` changes on `main` (low priority)
+  * Source: DR-04 above; researcher clarifying question 4
+  * Dependency: This issue must land first; evaluate operator comfort with automated provisioning before enabling
+
+* WI-05: Parameterize Log Analytics retention in `environment.bicep` to allow dev/prod divergence — Allow prod to retain longer for incident investigation while dev stays at 30 days for cost control (low priority)
+  * Source: DR-03 above
+  * Dependency: None
+
+## Design Decisions
+
+* DD-02: `workloadProfiles` array is declared explicitly in `environment.bicep` with `{ name: 'Consumption', workloadProfileType: 'Consumption' }`
+  * Why not implicit: omitting `workloadProfiles` creates a legacy Consumption-only environment where the profile is not visible as a named entity. Explicit declaration ensures the named `'Consumption'` profile required by `main.bicep` is always resolvable and forward-compatible if a dedicated profile is added later.
+  * Trade-off: technically enables dedicated-profile capacity even though neither environment uses it today. Accepted as low risk given current cost controls.

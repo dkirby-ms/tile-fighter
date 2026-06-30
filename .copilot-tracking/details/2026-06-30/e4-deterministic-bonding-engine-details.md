@@ -11,7 +11,7 @@ Sources: .copilot-tracking/research/2026-06-30/e4-deterministic-bonding-and-task
 
 ### Step 1.1: Add bond types and a pure evaluator in the shared contract layer
 
-Create a shared bonding module that exports the bond type union and a deterministic evaluator function. Keep the evaluator pure, accept the placed tile plus a bounded neighborhood, and canonicalize ordering before rule evaluation so repeated runs produce identical outcomes.
+Create a shared bonding module that exports the bond type union and a deterministic evaluator function. Keep the evaluator pure, accept the placed tile plus a rule-specific local window, and canonicalize ordering before rule evaluation so repeated runs produce identical outcomes while preserving the most expressive bond geometry.
 
 Files:
 * packages/shared-types/src/bonding.ts - New bonding rule definitions and evaluator implementation
@@ -22,7 +22,7 @@ Discrepancy references:
 
 Success criteria:
 * The shared module exports `glow-chain`, `blend-gradient`, and `pulse-rhythm` types
-* The evaluator returns the same result for equivalent neighborhoods regardless of input order
+* The evaluator returns the same result for equivalent local windows regardless of input order
 * The evaluator does not perform I/O or mutate shared state
 
 Context references:
@@ -44,7 +44,7 @@ Discrepancy references:
 * Addresses DR-01 in .copilot-tracking/plans/logs/2026-06-30/e4-deterministic-bonding-engine-log.md by keeping the first implementation focused on server-authoritative behavior rather than client VFX wiring
 
 Success criteria:
-* Only nearby tiles are fetched for evaluation input
+* Only the tiles required by the current bond rule window are fetched for evaluation input
 * Bonding is computed only after a successful authoritative placement commit
 * The placement success path remains deterministic and side-effect ordering stays stable
 
@@ -181,6 +181,6 @@ If validation exposes unresolved rule-definition ambiguity or broader contract w
 
 ## Success Criteria
 
-* The bonding evaluator returns stable outcomes for all E4-S1 scenarios and equivalent input permutations
+* The bonding evaluator returns stable outcomes for all E4-S1 scenarios and equivalent rule-window permutations
 * Placement-triggered bonding emits the required telemetry after commit success and not before
 * The new unit and integration suites pass without introducing nondeterministic failures
