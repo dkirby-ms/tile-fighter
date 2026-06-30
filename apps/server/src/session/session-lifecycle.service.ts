@@ -1,9 +1,11 @@
 import { TelemetrySink } from "../telemetry/telemetry-sink.js";
+import { SessionCheckpointService } from "./session-checkpoint.service.js";
 
 export type SessionLifecycleServiceOptions = {
   heartbeatTtlSeconds: number;
   cleanupIntervalSeconds: number;
   telemetrySink: TelemetrySink;
+  checkpointService?: SessionCheckpointService;
   now?: () => number;
 };
 
@@ -18,6 +20,7 @@ export class SessionLifecycleService {
   private readonly heartbeatTtlMs: number;
   private readonly cleanupIntervalMs: number;
   private readonly telemetrySink: TelemetrySink;
+  private readonly checkpointService: SessionCheckpointService | undefined;
   private readonly now: () => number;
   private readonly presenceBySubject = new Map<string, PresenceMetadata>();
   private cleanupTimer: ReturnType<typeof setInterval> | undefined;
@@ -26,6 +29,7 @@ export class SessionLifecycleService {
     this.heartbeatTtlMs = options.heartbeatTtlSeconds * 1000;
     this.cleanupIntervalMs = options.cleanupIntervalSeconds * 1000;
     this.telemetrySink = options.telemetrySink;
+    this.checkpointService = options.checkpointService;
     this.now = options.now ?? (() => Date.now());
   }
 
@@ -36,6 +40,9 @@ export class SessionLifecycleService {
 
     this.cleanupTimer = setInterval(() => {
       void this.cleanupStaleMetadata();
+      if (this.checkpointService) {
+        void this.checkpointService.archiveExpiredStaleCheckpoints();
+      }
     }, this.cleanupIntervalMs);
   }
 
@@ -48,7 +55,7 @@ export class SessionLifecycleService {
     this.cleanupTimer = undefined;
   }
 
-  noteRoomJoin(tenantScopedSubject: string, roomId: string): void {
+  async noteRoomJoin(tenantScopedSubject: string, roomId: string): Promise<void> {
     const nowMs = this.now();
     this.presenceBySubject.set(tenantScopedSubject, {
       tenantScopedSubject,
@@ -57,17 +64,32 @@ export class SessionLifecycleService {
       lastTransportEventAtMs: nowMs
     });
 
+    if (this.checkpointService) {
+      const checkpoint = await this.checkpointService.noteJoin(tenantScopedSubject, roomId);
+      await this.telemetrySink.emit("room_joined", {
+        tenantScopedSubject,
+        roomId,
+        sessionId: checkpoint.sessionId,
+        isFirstJoin: checkpoint.wasCreated,
+        checkpointId: checkpoint.checkpointId
+      });
+    }
+
     void this.telemetrySink.emit("session_heartbeat", {
       tenantScopedSubject,
       roomId
     });
   }
 
-  noteRoomLeave(tenantScopedSubject: string, roomId: string): void {
+  async noteRoomLeave(tenantScopedSubject: string, roomId: string): Promise<void> {
     const presence = this.presenceBySubject.get(tenantScopedSubject);
 
     if (presence && presence.roomId === roomId) {
       this.presenceBySubject.delete(tenantScopedSubject);
+    }
+
+    if (this.checkpointService) {
+      await this.checkpointService.noteLeave(tenantScopedSubject, roomId);
     }
 
     void this.telemetrySink.emit("session_ended", {

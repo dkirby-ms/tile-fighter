@@ -10,7 +10,7 @@
     "build": "tsc -b",
     "lint": "eslint src tests --ext .ts",
     "test": "vitest run",
-    "test:load": "tsx tests/load/room-join-load.ts",
+    "test:load": "vitest run tests/load",
     "migrate:up": "tsx src/persistence/migrate.ts -m src/persistence/migrations up",
     "migrate:down": "tsx src/persistence/migrate.ts -m src/persistence/migrations down"
   },

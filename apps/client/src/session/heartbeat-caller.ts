@@ -3,7 +3,14 @@ import { ExternalIdSessionStateMachine } from "../auth/external-id-session.js";
 export type HeartbeatResponse = {
   accepted: boolean;
   roomId: string;
+  reconnectToken?: string | null;
 };
+
+export function getReconnectTokenFromHeartbeat(response: HeartbeatResponse): string | null {
+  return typeof response.reconnectToken === "string" && response.reconnectToken.length > 0
+    ? response.reconnectToken
+    : null;
+}
 
 export async function sendHeartbeat(
   authSession: ExternalIdSessionStateMachine,

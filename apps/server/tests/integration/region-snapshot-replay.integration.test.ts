@@ -79,6 +79,10 @@ describe("Region snapshot replay integration", () => {
       telemetrySink,
       authService: authService as never,
       lifecycleService: createLifecycleService(telemetrySink),
+      checkpointService: {
+        issueReconnectTokenForSubject: vi.fn(async () => "reconnect-token"),
+        resolveReconnect: vi.fn(async () => ({ ok: false, reason: "checkpoint_not_found" }))
+      } as never,
       regionSnapshotService: regionSnapshotService as never
     });
 

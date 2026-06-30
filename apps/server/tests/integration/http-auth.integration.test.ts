@@ -16,6 +16,21 @@ describe("HTTP auth integration", () => {
     });
   }
 
+  function createCheckpointServiceStub(options?: {
+    reconnectToken?: string | null;
+    resolveReconnectResult?: { ok: false; reason: "subject_mismatch" | "room_mismatch" | "checkpoint_not_found" };
+  }) {
+    return {
+      issueReconnectTokenForSubject: vi.fn(async () => options?.reconnectToken ?? "reconnect-token-auth"),
+      resolveReconnect: vi.fn(async () =>
+        options?.resolveReconnectResult ?? {
+          ok: false,
+          reason: "checkpoint_not_found"
+        }
+      )
+    };
+  }
+
   it("returns unauthorized without bearer token", async () => {
     const authService = {
       verifyAccessToken: vi.fn(async () => {
@@ -37,7 +52,8 @@ describe("HTTP auth integration", () => {
       telemetrySink: {
         emit: vi.fn(async () => undefined)
       } as unknown as TelemetrySink,
-      lifecycleService: createLifecycleService({ emit: vi.fn(async () => undefined) } as unknown as TelemetrySink)
+      lifecycleService: createLifecycleService({ emit: vi.fn(async () => undefined) } as unknown as TelemetrySink),
+      checkpointService: createCheckpointServiceStub() as never
     });
 
     const response = await request(app).get("/api/protected/profile");
@@ -73,7 +89,8 @@ describe("HTTP auth integration", () => {
       authMiddleware: buildAuthMiddleware(authService as never),
       telemetrySink,
       authService: authService as never,
-      lifecycleService: createLifecycleService(telemetrySink)
+      lifecycleService: createLifecycleService(telemetrySink),
+      checkpointService: createCheckpointServiceStub() as never
     });
 
     const response = await request(app)
@@ -113,7 +130,8 @@ describe("HTTP auth integration", () => {
       authMiddleware: buildAuthMiddleware(authService as never),
       telemetrySink,
       authService: authService as never,
-      lifecycleService: createLifecycleService(telemetrySink)
+      lifecycleService: createLifecycleService(telemetrySink),
+      checkpointService: createCheckpointServiceStub() as never
     });
 
     const response = await request(app)
@@ -159,7 +177,8 @@ describe("HTTP auth integration", () => {
       authMiddleware: buildAuthMiddleware(authService as never),
       telemetrySink,
       authService: authService as never,
-      lifecycleService: createLifecycleService(telemetrySink)
+      lifecycleService: createLifecycleService(telemetrySink),
+      checkpointService: createCheckpointServiceStub() as never
     });
 
     const response = await request(app)
@@ -199,7 +218,8 @@ describe("HTTP auth integration", () => {
       authMiddleware: buildAuthMiddleware(authService as never),
       telemetrySink,
       authService: authService as never,
-      lifecycleService: createLifecycleService(telemetrySink)
+      lifecycleService: createLifecycleService(telemetrySink),
+      checkpointService: createCheckpointServiceStub() as never
     });
 
     const response = await request(app)
@@ -242,6 +262,7 @@ describe("HTTP auth integration", () => {
         emit: vi.fn(async () => undefined)
       } as unknown as TelemetrySink,
       lifecycleService: createLifecycleService({ emit: vi.fn(async () => undefined) } as unknown as TelemetrySink),
+      checkpointService: createCheckpointServiceStub() as never,
       regionSnapshotService: {
         createSnapshot: vi.fn(async () => ({
           snapshotId: "snapshot-1",
@@ -316,6 +337,7 @@ describe("HTTP auth integration", () => {
         emit: vi.fn(async () => undefined)
       } as unknown as TelemetrySink,
       lifecycleService: createLifecycleService({ emit: vi.fn(async () => undefined) } as unknown as TelemetrySink),
+      checkpointService: createCheckpointServiceStub() as never,
       regionSnapshotService: regionSnapshotService as never
     });
 
@@ -357,6 +379,7 @@ describe("HTTP auth integration", () => {
         emit: vi.fn(async () => undefined)
       } as unknown as TelemetrySink,
       lifecycleService: createLifecycleService({ emit: vi.fn(async () => undefined) } as unknown as TelemetrySink),
+      checkpointService: createCheckpointServiceStub() as never,
       regionSnapshotService: {
         createSnapshot: vi.fn(async () => ({
           snapshotId: "snapshot-1",
@@ -424,6 +447,7 @@ describe("HTTP auth integration", () => {
         emit: vi.fn(async () => undefined)
       } as unknown as TelemetrySink,
       lifecycleService: createLifecycleService({ emit: vi.fn(async () => undefined) } as unknown as TelemetrySink),
+      checkpointService: createCheckpointServiceStub() as never,
       regionSnapshotService: regionSnapshotService as never
     });
 
@@ -434,5 +458,52 @@ describe("HTTP auth integration", () => {
 
     expect(response.status).toBe(201);
     expect(regionSnapshotService.createSnapshot).toHaveBeenCalledOnce();
+  });
+
+  it("returns 403 on reconnect when token subject belongs to another tenant", async () => {
+    const authService = {
+      verifyAccessToken: vi.fn(async () => ({
+        subject: "player-1",
+        tenantScopedSubject: "tenant-b|player-1",
+        issuer: "https://issuer.example",
+        audience: "api://tile-fighter-server",
+        tenantId: "tenant-b",
+        tokenVersion: "2.0",
+        expiresAt: 1_900_000_000
+      })),
+      issueJoinToken: vi.fn()
+    };
+
+    const checkpointService = createCheckpointServiceStub({
+      resolveReconnectResult: {
+        ok: false,
+        reason: "subject_mismatch"
+      }
+    });
+
+    const app = createHttpApp({
+      readinessCheck: async () => ({
+        ok: true,
+        checks: {
+          database: "ok",
+          config: "ok"
+        }
+      }),
+      authMiddleware: buildAuthMiddleware(authService as never),
+      authService: authService as never,
+      telemetrySink: {
+        emit: vi.fn(async () => undefined)
+      } as unknown as TelemetrySink,
+      lifecycleService: createLifecycleService({ emit: vi.fn(async () => undefined) } as unknown as TelemetrySink),
+      checkpointService: checkpointService as never
+    });
+
+    const response = await request(app)
+      .post("/api/session/reconnect")
+      .set("Authorization", "Bearer valid-token")
+      .send({ roomId: "arena", reconnectToken: "tenant-a-token" });
+
+    expect(response.status).toBe(403);
+    expect(response.body.error).toBe("subject_mismatch");
   });
 });

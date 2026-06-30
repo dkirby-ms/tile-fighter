@@ -20,6 +20,16 @@ export interface IRegionDiffRepository {
     db: Kysely<ServerDatabase>,
     input: GetTileDeltasSinceInput
   ): Promise<TileDeltasSelect[]>;
+  getMinimumProtectedVersion(db: Kysely<ServerDatabase>, regionId: string): Promise<number | null>;
+  getRetainedTileDeltasSince(
+    db: Kysely<ServerDatabase>,
+    input: GetTileDeltasSinceInput,
+    minimumProtectedVersion: number | null
+  ): Promise<TileDeltasSelect[]>;
+  deleteExpiredTileDeltas(
+    db: Kysely<ServerDatabase>,
+    input: { regionId: string; expiresBefore: Date; minimumProtectedVersion: number | null }
+  ): Promise<number>;
 }
 
 export class RegionDiffRepository implements IRegionDiffRepository {
@@ -53,6 +63,58 @@ export class RegionDiffRepository implements IRegionDiffRepository {
       .orderBy("version", "asc")
       .orderBy("id", "asc")
       .execute();
+  }
+
+  async getMinimumProtectedVersion(
+    db: Kysely<ServerDatabase>,
+    regionId: string
+  ): Promise<number | null> {
+    const row = await db
+      .selectFrom("session_checkpoints")
+      .select(({ fn }) => [fn.min("last_confirmed_version").as("min_version")])
+      .where("region_id", "=", regionId)
+      .where("archived_at", "is", null)
+      .executeTakeFirst();
+
+    if (!row || row.min_version === null) {
+      return null;
+    }
+
+    return Number(row.min_version);
+  }
+
+  async getRetainedTileDeltasSince(
+    db: Kysely<ServerDatabase>,
+    input: GetTileDeltasSinceInput,
+    minimumProtectedVersion: number | null
+  ): Promise<TileDeltasSelect[]> {
+    const effectiveSinceVersion =
+      minimumProtectedVersion === null
+        ? input.sinceVersion
+        : Math.max(input.sinceVersion, minimumProtectedVersion - 1);
+
+    return await this.getTileDeltasSince(db, {
+      ...input,
+      sinceVersion: effectiveSinceVersion
+    });
+  }
+
+  async deleteExpiredTileDeltas(
+    db: Kysely<ServerDatabase>,
+    input: { regionId: string; expiresBefore: Date; minimumProtectedVersion: number | null }
+  ): Promise<number> {
+    let query = db
+      .deleteFrom("tile_deltas")
+      .where("region_id", "=", input.regionId)
+      .where("ttl_expires_at", "is not", null)
+      .where("ttl_expires_at", "<", input.expiresBefore);
+
+    if (input.minimumProtectedVersion !== null) {
+      query = query.where("version", "<", String(input.minimumProtectedVersion));
+    }
+
+    const deleted = await query.returning(["id"]).execute();
+    return deleted.length;
   }
 }
 

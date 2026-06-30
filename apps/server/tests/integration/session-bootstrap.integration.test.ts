@@ -6,6 +6,13 @@ import { TelemetrySink } from "../../src/telemetry/telemetry-sink.js";
 import { SessionLifecycleService } from "../../src/session/session-lifecycle.service.js";
 
 describe("Session bootstrap integration", () => {
+  function createCheckpointServiceStub() {
+    return {
+      issueReconnectTokenForSubject: vi.fn(async () => "reconnect-token"),
+      resolveReconnect: vi.fn(async () => ({ ok: false, reason: "checkpoint_not_found" }))
+    };
+  }
+
   function createLifecycleService(telemetrySink: TelemetrySink): SessionLifecycleService {
     return new SessionLifecycleService({
       heartbeatTtlSeconds: 30,
@@ -37,7 +44,8 @@ describe("Session bootstrap integration", () => {
       authMiddleware: buildAuthMiddleware(authService as never),
       telemetrySink,
       authService: authService as never,
-      lifecycleService: createLifecycleService(telemetrySink)
+      lifecycleService: createLifecycleService(telemetrySink),
+      checkpointService: createCheckpointServiceStub() as never
     });
 
     const response = await request(app).get("/api/session/bootstrap");
@@ -74,7 +82,8 @@ describe("Session bootstrap integration", () => {
       authMiddleware: buildAuthMiddleware(authService as never),
       telemetrySink,
       authService: authService as never,
-      lifecycleService: createLifecycleService(telemetrySink)
+      lifecycleService: createLifecycleService(telemetrySink),
+      checkpointService: createCheckpointServiceStub() as never
     });
 
     const response = await request(app)
@@ -125,7 +134,8 @@ describe("Session bootstrap integration", () => {
       authMiddleware: buildAuthMiddleware(authService as never),
       telemetrySink,
       authService: authService as never,
-      lifecycleService: createLifecycleService(telemetrySink)
+      lifecycleService: createLifecycleService(telemetrySink),
+      checkpointService: createCheckpointServiceStub() as never
     });
 
     const response = await request(app)
@@ -170,7 +180,8 @@ describe("Session bootstrap integration", () => {
       authMiddleware: buildAuthMiddleware(authService as never),
       telemetrySink,
       authService: authService as never,
-      lifecycleService: createLifecycleService(telemetrySink)
+      lifecycleService: createLifecycleService(telemetrySink),
+      checkpointService: createCheckpointServiceStub() as never
     });
 
     for (let i = 0; i < 10; i += 1) {

@@ -41,6 +41,19 @@ export type GetRegionDiffResult = {
   truncated: boolean;
 };
 
+export type GetReplayDiffInput = {
+  regionId: string;
+  sinceVersion: number;
+};
+
+export type GetReplayDiffResult = {
+  ok: true;
+  regionId: string;
+  sinceVersion: number;
+  currentVersion: number;
+  tiles: RegionDiffTileDelta[];
+};
+
 function getViewportArea(viewport: ViewportBounds): number {
   const width = Math.max(0, viewport.maxCellX - viewport.minCellX + 1);
   const height = Math.max(0, viewport.maxCellY - viewport.minCellY + 1);
@@ -183,6 +196,34 @@ export class RegionDiffService {
       isEmpty: tiles.length === 0,
       tiles,
       truncated
+    };
+  }
+
+  async getReplayDiff(input: GetReplayDiffInput): Promise<GetReplayDiffResult> {
+    const currentVersion = await this.dependencies.repository.getCurrentRegionVersion(
+      this.dependencies.db,
+      input.regionId
+    );
+
+    const replayViewport = {
+      minCellX: Number.MIN_SAFE_INTEGER,
+      maxCellX: Number.MAX_SAFE_INTEGER,
+      minCellY: Number.MIN_SAFE_INTEGER,
+      maxCellY: Number.MAX_SAFE_INTEGER
+    };
+
+    const deltas = await this.dependencies.repository.getTileDeltasSince(this.dependencies.db, {
+      regionId: input.regionId,
+      sinceVersion: input.sinceVersion,
+      viewport: replayViewport
+    });
+
+    return {
+      ok: true,
+      regionId: input.regionId,
+      sinceVersion: input.sinceVersion,
+      currentVersion,
+      tiles: deltas.map((delta) => mapDelta(delta))
     };
   }
 }

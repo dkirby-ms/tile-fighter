@@ -15,11 +15,36 @@ export type BootstrapPayload = {
   };
 };
 
+export type ReconnectContext = {
+  tenantScopedSubject: string;
+  roomId: string;
+  reconnectToken: string;
+  checkpointVersion: number;
+  savedAtMs: number;
+};
+
 export class SessionBootstrapStore {
+  private reconnectContext: ReconnectContext | null = null;
+
   constructor(
     private readonly authSession: ExternalIdSessionStateMachine,
     private readonly bootstrapEndpoint: string
   ) {}
+
+  setReconnectContext(context: ReconnectContext): void {
+    this.reconnectContext = {
+      ...context,
+      savedAtMs: context.savedAtMs
+    };
+  }
+
+  getReconnectContext(): ReconnectContext | null {
+    return this.reconnectContext ? { ...this.reconnectContext } : null;
+  }
+
+  clearReconnectContext(): void {
+    this.reconnectContext = null;
+  }
 
   async bootstrap(): Promise<BootstrapPayload> {
     const tokenState = await this.authSession.acquireTokenReadyState();

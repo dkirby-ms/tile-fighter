@@ -80,6 +80,10 @@ describe("Load-focused authoritative placement and throttle paths", () => {
         cleanupIntervalSeconds: 5,
         telemetrySink
       }),
+      checkpointService: {
+        issueReconnectTokenForSubject: vi.fn(async () => "reconnect-token"),
+        resolveReconnect: vi.fn(async () => ({ ok: false, reason: "checkpoint_not_found" }))
+      } as never,
       db: {} as Kysely<ServerDatabase>,
       tileRepository
     });
@@ -147,7 +151,11 @@ describe("Load-focused authoritative placement and throttle paths", () => {
       authMiddleware: buildAuthMiddleware(authService as never),
       telemetrySink,
       authService: authService as never,
-      lifecycleService
+      lifecycleService,
+      checkpointService: {
+        issueReconnectTokenForSubject: vi.fn(async () => "reconnect-token"),
+        resolveReconnect: vi.fn(async () => ({ ok: false, reason: "checkpoint_not_found" }))
+      } as never
     });
 
     const burst = 40;

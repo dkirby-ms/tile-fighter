@@ -15,6 +15,13 @@ describe("Join token integration", () => {
     });
   }
 
+  function createCheckpointServiceStub() {
+    return {
+      issueReconnectTokenForSubject: vi.fn(async () => "reconnect-token"),
+      resolveReconnect: vi.fn(async () => ({ ok: false, reason: "checkpoint_not_found" }))
+    };
+  }
+
   it("issues join token for authenticated caller", async () => {
     const authService = {
       verifyAccessToken: vi.fn(async () => ({
@@ -44,9 +51,9 @@ describe("Join token integration", () => {
       authMiddleware: buildAuthMiddleware(authService as never),
       telemetrySink,
       authService: authService as never,
-      lifecycleService: createLifecycleService(telemetrySink)
+      lifecycleService: createLifecycleService(telemetrySink),
+      checkpointService: createCheckpointServiceStub() as never
     });
-
     const response = await request(app)
       .post("/api/session/join-token")
       .set("Authorization", "Bearer valid-token")
@@ -80,9 +87,9 @@ describe("Join token integration", () => {
       authMiddleware: buildAuthMiddleware(authService as never),
       telemetrySink,
       authService: authService as never,
-      lifecycleService: createLifecycleService(telemetrySink)
+      lifecycleService: createLifecycleService(telemetrySink),
+      checkpointService: createCheckpointServiceStub() as never
     });
-
     const response = await request(app).post("/api/session/join-token").send({ roomId: ArenaRoom.ROOM_KEY });
 
     expect(response.status).toBe(401);
@@ -117,9 +124,9 @@ describe("Join token integration", () => {
       authMiddleware: buildAuthMiddleware(authService as never),
       telemetrySink,
       authService: authService as never,
-      lifecycleService: createLifecycleService(telemetrySink)
+      lifecycleService: createLifecycleService(telemetrySink),
+      checkpointService: createCheckpointServiceStub() as never
     });
-
     const response = await request(app)
       .post("/api/session/join-token")
       .set("Authorization", "Bearer valid-token")
@@ -158,9 +165,9 @@ describe("Join token integration", () => {
       authMiddleware: buildAuthMiddleware(authService as never),
       telemetrySink,
       authService: authService as never,
-      lifecycleService: createLifecycleService(telemetrySink)
+      lifecycleService: createLifecycleService(telemetrySink),
+      checkpointService: createCheckpointServiceStub() as never
     });
-
     const response = await request(app)
       .post("/api/session/join-token")
       .set("Authorization", "Bearer valid-token")

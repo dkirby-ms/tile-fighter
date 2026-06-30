@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { sendHeartbeat } from "../../src/session/heartbeat-caller.js";
+import {
+  getReconnectTokenFromHeartbeat,
+  sendHeartbeat
+} from "../../src/session/heartbeat-caller.js";
 import type { ExternalIdSessionStateMachine } from "../../src/auth/external-id-session.js";
 import type { AcquireTokenResult } from "../../src/auth/external-id-session.js";
 
@@ -48,6 +51,31 @@ describe("sendHeartbeat", () => {
 
     expect(result).toEqual(expected);
     vi.unstubAllGlobals();
+  });
+
+  it("returns reconnect token when heartbeat includes one", async () => {
+    const auth = makeMockAuth();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(
+          JSON.stringify({ accepted: true, roomId: ROOM_ID, reconnectToken: "rtok-123" }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" }
+          }
+        )
+      )
+    );
+
+    const result = await sendHeartbeat(auth, ENDPOINT, ROOM_ID);
+
+    expect(getReconnectTokenFromHeartbeat(result)).toBe("rtok-123");
+    vi.unstubAllGlobals();
+  });
+
+  it("returns null reconnect token when heartbeat response omits token", () => {
+    expect(getReconnectTokenFromHeartbeat({ accepted: true, roomId: ROOM_ID })).toBeNull();
   });
 
   it("retries silently on 401 and succeeds", async () => {

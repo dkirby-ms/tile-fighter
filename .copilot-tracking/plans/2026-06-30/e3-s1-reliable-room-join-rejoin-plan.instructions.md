@@ -54,72 +54,72 @@ Implement checkpoint-backed reconnect and rejoin replay with checksum validation
 
 ## Implementation Checklist
 
-### [ ] Implementation Phase 1: Data Contract and Persistence Foundation
+### [x] Implementation Phase 1: Data Contract and Persistence Foundation
 
 <!-- parallelizable: false -->
 
-* [ ] Step 1.1: Create checkpoint schema and migration
+* [x] Step 1.1: Create checkpoint schema and migration
   * Details: .copilot-tracking/details/2026-06-30/e3-s1-reliable-room-join-rejoin-details.md (Lines 9-28)
-* [ ] Step 1.2: Extend DB typings and repository APIs for checkpoint reads/writes and retention-aware delta operations
+* [x] Step 1.2: Extend DB typings and repository APIs for checkpoint reads/writes and retention-aware delta operations
   * Details: .copilot-tracking/details/2026-06-30/e3-s1-reliable-room-join-rejoin-details.md (Lines 29-45)
-* [ ] Step 1.3: Validate phase changes
+* [x] Step 1.3: Validate phase changes
   * Run lint and build commands for modified files
   * Skip if validation conflicts with parallel phases
 
-### [ ] Implementation Phase 2: Server Reconnect and Replay Orchestration
+### [x] Implementation Phase 2: Server Reconnect and Replay Orchestration
 
 <!-- parallelizable: false -->
 
-* [ ] Step 2.1: Implement session checkpoint lifecycle service and grace-state transitions
+* [x] Step 2.1: Implement session checkpoint lifecycle service and grace-state transitions
   * Details: .copilot-tracking/details/2026-06-30/e3-s1-reliable-room-join-rejoin-details.md (Lines 52-72)
-* [ ] Step 2.2: Add reconnect endpoint/token validation and stale token rejection handling
+* [x] Step 2.2: Add reconnect endpoint/token validation and stale token rejection handling
   * Details: .copilot-tracking/details/2026-06-30/e3-s1-reliable-room-join-rejoin-details.md (Lines 73-92)
-* [ ] Step 2.3: Integrate replay orchestration and telemetry in room/session flows
+* [x] Step 2.3: Integrate replay orchestration and telemetry in room/session flows
   * Details: .copilot-tracking/details/2026-06-30/e3-s1-reliable-room-join-rejoin-details.md (Lines 93-111)
-* [ ] Step 2.4: Lock checksum authority contract to full-region canonical scope in reconnect/replay APIs
+* [x] Step 2.4: Lock checksum authority contract to full-region canonical scope in reconnect/replay APIs
   * Details: .copilot-tracking/details/2026-06-30/e3-s1-reliable-room-join-rejoin-details.md (Lines 112-122)
-* [ ] Step 2.5: Validate phase changes
+* [x] Step 2.5: Validate phase changes
   * Run lint and build commands for modified files
   * Skip if validation conflicts with parallel phases
 
-### [ ] Implementation Phase 3: Client Recovery and Checksum Validation
+### [x] Implementation Phase 3: Client Recovery and Checksum Validation
 
 <!-- parallelizable: false -->
 
-* [ ] Step 3.1: Extend client session callers for reconnect handshake and replay retrieval
+* [x] Step 3.1: Extend client session callers for reconnect handshake and replay retrieval
   * Details: .copilot-tracking/details/2026-06-30/e3-s1-reliable-room-join-rejoin-details.md (Lines 118-133)
-* [ ] Step 3.2: Implement deterministic client replay apply and checksum comparison flow
+* [x] Step 3.2: Implement deterministic client replay apply and checksum comparison flow
   * Details: .copilot-tracking/details/2026-06-30/e3-s1-reliable-room-join-rejoin-details.md (Lines 134-150)
-* [ ] Step 3.3: Validate phase changes
+* [x] Step 3.3: Validate phase changes
   * Run lint and build commands for modified files
   * Skip if validation conflicts with parallel phases
 
-### [ ] Implementation Phase 4: Reliability Validation and Operational Hardening
+### [x] Implementation Phase 4: Reliability Validation and Operational Hardening
 
 <!-- parallelizable: false -->
 
-* [ ] Step 4.1: Add integration and smoke coverage for AC1/AC2/AC3
+* [x] Step 4.1: Add integration and smoke coverage for AC1/AC2/AC3
   * Details: .copilot-tracking/details/2026-06-30/e3-s1-reliable-room-join-rejoin-details.md (Lines 157-177)
-* [ ] Step 4.2: Add mass reconnect load scenario and retention cleanup checks
+* [x] Step 4.2: Add mass reconnect load scenario and retention cleanup checks
   * Details: .copilot-tracking/details/2026-06-30/e3-s1-reliable-room-join-rejoin-details.md (Lines 178-196)
-* [ ] Step 4.3: Add explicit security-abuse test assertions for reconnect flows
+* [x] Step 4.3: Add explicit security-abuse test assertions for reconnect flows
   * Details: .copilot-tracking/details/2026-06-30/e3-s1-reliable-room-join-rejoin-details.md (Lines 197-214)
-* [ ] Step 4.4: Validate phase changes
+* [x] Step 4.4: Validate phase changes
   * Run lint and build commands for modified files
   * Skip if validation conflicts with parallel phases
 
-### [ ] Implementation Phase 5: Validation
+### [x] Implementation Phase 5: Validation
 
 <!-- parallelizable: false -->
 
-* [ ] Step 5.1: Run full project validation
+* [x] Step 5.1: Run full project validation
   * Execute all lint commands (`npm run lint`, language linters)
   * Execute build scripts for all modified components
   * Run test suites covering modified code
-* [ ] Step 5.2: Fix minor validation issues
+* [x] Step 5.2: Fix minor validation issues
   * Iterate on lint errors and build warnings
   * Apply fixes directly when corrections are straightforward
-* [ ] Step 5.3: Report blocking issues
+* [x] Step 5.3: Report blocking issues
   * Document issues requiring additional research
   * Provide user with next steps and recommended planning
   * Avoid large-scale fixes within this phase

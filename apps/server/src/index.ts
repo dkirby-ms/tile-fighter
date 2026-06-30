@@ -20,6 +20,9 @@ import { TelemetrySink } from "./telemetry/telemetry-sink.js";
 import { SessionLifecycleService } from "./session/session-lifecycle.service.js";
 import { createRegionSnapshotService } from "./domain/region-snapshot.service.js";
 import { createRegionDiffService } from "./domain/region-diff.service.js";
+import { createSessionCheckpointRepository } from "./persistence/session-checkpoint.repository.js";
+import { SessionCheckpointService } from "./session/session-checkpoint.service.js";
+import { ReconnectTokenService } from "./auth/reconnect-token.service.js";
 
 async function bootstrap(): Promise<void> {
   const runtimeConfig = readRuntimeConfig();
@@ -41,10 +44,25 @@ async function bootstrap(): Promise<void> {
     repository: regionDiffRepository,
     telemetrySink
   });
+  const sessionCheckpointRepository = createSessionCheckpointRepository();
+  const reconnectTokenService = new ReconnectTokenService({
+    signingSecret: runtimeConfig.joinTokenSigningSecret,
+    ttlSeconds: runtimeConfig.joinTokenTtlSeconds
+  });
+  const checkpointService = new SessionCheckpointService({
+    db: dbRuntime.db,
+    telemetrySink,
+    regionDiffService,
+    tileRepository,
+    reconnectTokenService,
+    checkpointRepository: sessionCheckpointRepository,
+    gracePeriodSeconds: runtimeConfig.sessionReconnectGracePeriodSeconds
+  });
   const lifecycleService = new SessionLifecycleService({
     heartbeatTtlSeconds: runtimeConfig.sessionHeartbeatTtlSeconds,
     cleanupIntervalSeconds: runtimeConfig.sessionCleanupIntervalSeconds,
-    telemetrySink
+    telemetrySink,
+    checkpointService
   });
   lifecycleService.start();
 
@@ -75,6 +93,7 @@ async function bootstrap(): Promise<void> {
     telemetrySink,
     authService,
     lifecycleService,
+    checkpointService,
     db: dbRuntime.db,
     tileRepository,
     regionSnapshotService,

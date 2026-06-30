@@ -42,18 +42,18 @@ export class ArenaRoom extends Room<{ state: ArenaState }> {
     return true;
   }
 
-  override onJoin(client: Client): void {
+  override async onJoin(client: Client): Promise<void> {
     const tenantScopedSubject = (client as AuthedClient).auth?.tenantScopedSubject;
     if (tenantScopedSubject) {
-      this.lifecycleService.noteRoomJoin(tenantScopedSubject, this.roomId);
+      await this.lifecycleService.noteRoomJoin(tenantScopedSubject, this.roomId);
     }
     client.send("joined", { roomId: this.roomId });
   }
 
-  override onLeave(client: Client): void {
+  override async onLeave(client: Client): Promise<void> {
     const tenantScopedSubject = (client as AuthedClient).auth?.tenantScopedSubject;
     if (tenantScopedSubject) {
-      this.lifecycleService.noteRoomLeave(tenantScopedSubject, this.roomId);
+      await this.lifecycleService.noteRoomLeave(tenantScopedSubject, this.roomId);
     }
   }
 }

@@ -27,6 +27,7 @@ const envSchema = z.object({
   JOIN_TOKEN_TTL_SECONDS: z.coerce.number().int().positive().max(120).default(120),
   SESSION_HEARTBEAT_TTL_SECONDS: z.coerce.number().int().positive().default(30),
   SESSION_CLEANUP_INTERVAL_SECONDS: z.coerce.number().int().positive().default(10),
+  SESSION_RECONNECT_GRACE_PERIOD_SECONDS: z.coerce.number().int().positive().default(300),
   TILE_PLACE_THROTTLE_MAX_REQUESTS: z.coerce.number().int().positive().default(5),
   TILE_PLACE_THROTTLE_WINDOW_MS: z.coerce.number().int().positive().default(60_000),
   TILE_PLACE_THROTTLE_TTL_MS: z.coerce.number().int().positive().default(24 * 60 * 60 * 1000),
@@ -55,6 +56,7 @@ export type RuntimeConfig = {
   joinTokenTtlSeconds: number;
   sessionHeartbeatTtlSeconds: number;
   sessionCleanupIntervalSeconds: number;
+  sessionReconnectGracePeriodSeconds: number;
   tilePlaceThrottleMaxRequests: number;
   tilePlaceThrottleWindowMs: number;
   tilePlaceThrottleTtlMs: number;
@@ -101,6 +103,7 @@ export function readRuntimeConfig(): RuntimeConfig {
     joinTokenTtlSeconds: parsed.JOIN_TOKEN_TTL_SECONDS,
     sessionHeartbeatTtlSeconds: parsed.SESSION_HEARTBEAT_TTL_SECONDS,
     sessionCleanupIntervalSeconds: parsed.SESSION_CLEANUP_INTERVAL_SECONDS,
+    sessionReconnectGracePeriodSeconds: parsed.SESSION_RECONNECT_GRACE_PERIOD_SECONDS,
     tilePlaceThrottleMaxRequests: parsed.TILE_PLACE_THROTTLE_MAX_REQUESTS,
     tilePlaceThrottleWindowMs: parsed.TILE_PLACE_THROTTLE_WINDOW_MS,
     tilePlaceThrottleTtlMs: parsed.TILE_PLACE_THROTTLE_TTL_MS,
