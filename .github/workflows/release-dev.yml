@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   release-dev:
-    name: Build and deploy dev
+    name: Build and deploy dev  # SHA-based deploy; semver-release.yml manages package version tagging separately
     runs-on: ubuntu-latest
     environment: dev
 
