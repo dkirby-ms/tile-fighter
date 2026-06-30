@@ -159,6 +159,62 @@ export class TelemetrySink {
   }
 
   /**
+   * Emit placement_conflict_detected when a coordinate conflict is observed.
+   */
+  async emitPlacementConflictDetected(input: {
+    regionId: string;
+    commandId: string;
+    actorId: string;
+    cellX: number;
+    cellY: number;
+    winnerOwnerId: string | null;
+    winnerTileId: number | null;
+  }): Promise<void> {
+    await this.emit("placement_conflict_detected", {
+      region_id: input.regionId,
+      command_id: input.commandId,
+      actor_id: input.actorId,
+      owner_id: input.actorId,
+      cell_x: input.cellX,
+      cell_y: input.cellY,
+      winner_owner_id: input.winnerOwnerId,
+      winner_tile_id: input.winnerTileId,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  /**
+   * Emit placement_conflict_resolved with deterministic conflict outcome details.
+   */
+  async emitPlacementConflictResolved(input: {
+    regionId: string;
+    commandId: string;
+    actorId: string;
+    cellX: number;
+    cellY: number;
+    outcome: "occupied";
+    replayed: boolean;
+    winnerOwnerId: string;
+    winnerTileId: number;
+    winnerResolvedAt: string;
+  }): Promise<void> {
+    await this.emit("placement_conflict_resolved", {
+      region_id: input.regionId,
+      command_id: input.commandId,
+      actor_id: input.actorId,
+      owner_id: input.actorId,
+      cell_x: input.cellX,
+      cell_y: input.cellY,
+      outcome: input.outcome,
+      replayed: input.replayed,
+      winner_owner_id: input.winnerOwnerId,
+      winner_tile_id: input.winnerTileId,
+      winner_resolved_at: input.winnerResolvedAt,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  /**
    * Emit tile_edited event for story-level bounded edit success.
    */
   async emitTileEdited(
@@ -274,6 +330,154 @@ export class TelemetrySink {
       tile_count: tileCount,
       truncated,
       duration_ms: durationMs,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  /**
+   * Emit delta_sent event when a delta is dispatched to a subscriber
+   * @param roomId - The arena room ID
+   * @param sessionId - The subscriber's session ID
+   * @param sequenceId - The delta sequence ID (region version)
+   * @param regionId - The region ID
+   * @param retransmitAttempt - The retransmit attempt number (0 for initial send)
+   */
+  async emitDeltaSent(
+    roomId: string,
+    sessionId: string,
+    sequenceId: string,
+    regionId: string,
+    retransmitAttempt: number
+  ): Promise<void> {
+    await this.emit("delta_sent", {
+      room_id: roomId,
+      session_id: sessionId,
+      sequence_id: sequenceId,
+      region_id: regionId,
+      retransmit_attempt: retransmitAttempt,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  /**
+   * Emit delta_acked event when a subscriber acknowledges receipt of a delta
+   * @param roomId - The arena room ID
+   * @param sessionId - The subscriber's session ID
+   * @param sequenceId - The delta sequence ID being acknowledged
+   * @param regionId - The region ID
+   */
+  async emitDeltaAcked(
+    roomId: string,
+    sessionId: string,
+    sequenceId: string,
+    regionId: string
+  ): Promise<void> {
+    await this.emit("delta_acked", {
+      room_id: roomId,
+      session_id: sessionId,
+      sequence_id: sequenceId,
+      region_id: regionId,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  /**
+   * Emit delta_retransmitted event when a delta is retransmitted due to ack timeout
+   * @param roomId - The arena room ID
+   * @param sessionId - The subscriber's session ID
+   * @param sequenceId - The delta sequence ID being retransmitted
+   * @param regionId - The region ID
+   * @param retransmitAttempt - The retransmit attempt number
+   * @param timeoutReasonMs - The timeout value in milliseconds that triggered retransmit
+   */
+  async emitDeltaRetransmitted(
+    roomId: string,
+    sessionId: string,
+    sequenceId: string,
+    regionId: string,
+    retransmitAttempt: number,
+    timeoutReasonMs: number
+  ): Promise<void> {
+    await this.emit("delta_retransmitted", {
+      room_id: roomId,
+      session_id: sessionId,
+      sequence_id: sequenceId,
+      region_id: regionId,
+      retransmit_attempt: retransmitAttempt,
+      timeout_reason_ms: timeoutReasonMs,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  /**
+   * Emit load_run_started when a sustained load scenario begins.
+   */
+  async emitLoadRunStarted(input: {
+    scenarioId: string;
+    ccu: number;
+    durationMinutes: number;
+    runClass: string;
+    evidencePath: string;
+  }): Promise<void> {
+    await this.emit("load_run_started", {
+      scenario_id: input.scenarioId,
+      ccu: input.ccu,
+      duration_minutes: input.durationMinutes,
+      run_class: input.runClass,
+      evidence_path: input.evidencePath,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  /**
+   * Emit load_run_completed when a sustained load scenario finishes.
+   * Records measured percentiles, sample counts, and whether all budgets passed.
+   */
+  async emitLoadRunCompleted(input: {
+    scenarioId: string;
+    ccu: number;
+    durationMinutes: number;
+    runClass: string;
+    evidencePath: string;
+    placementAckMedianMs: number;
+    reconnectP95Ms: number;
+    roundsCompleted: number;
+    placementSampleCount: number;
+    reconnectSampleCount: number;
+    budgetPassed: boolean;
+  }): Promise<void> {
+    await this.emit("load_run_completed", {
+      scenario_id: input.scenarioId,
+      ccu: input.ccu,
+      duration_minutes: input.durationMinutes,
+      run_class: input.runClass,
+      evidence_path: input.evidencePath,
+      placement_ack_median_ms: input.placementAckMedianMs,
+      reconnect_p95_ms: input.reconnectP95Ms,
+      rounds_completed: input.roundsCompleted,
+      placement_sample_count: input.placementSampleCount,
+      reconnect_sample_count: input.reconnectSampleCount,
+      budget_passed: input.budgetPassed,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  /**
+   * Emit load_budget_violation when a measured metric exceeds its configured threshold.
+   */
+  async emitLoadBudgetViolation(input: {
+    scenarioId: string;
+    metricName: string;
+    measuredMs: number;
+    budgetMs: number;
+    runClass: string;
+  }): Promise<void> {
+    await this.emit("load_budget_violation", {
+      scenario_id: input.scenarioId,
+      metric_name: input.metricName,
+      measured_ms: input.measuredMs,
+      budget_ms: input.budgetMs,
+      run_class: input.runClass,
       timestamp: new Date().toISOString()
     });
   }

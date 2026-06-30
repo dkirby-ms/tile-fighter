@@ -50,11 +50,17 @@ describe("Load-focused authoritative placement and throttle paths", () => {
         return {
           ok: false as const,
           reason: "coordinate_conflict" as const,
+          commandId: "cmd_room_join_load_conflict_0001",
+          regionId: "arena-main",
+          replayed: false,
           error: {
             type: "coordinate_conflict" as const,
             region_id: "arena-main",
             cell_x: 3,
-            cell_y: 4
+            cell_y: 4,
+            winner_owner_id: "tenant-a|winner",
+            winner_tile_id: 101,
+            winner_resolved_at: new Date("2026-06-29T12:00:00.000Z")
           }
         };
       }),
@@ -90,11 +96,12 @@ describe("Load-focused authoritative placement and throttle paths", () => {
 
     const attempts = 12;
     const responses = await Promise.all(
-      Array.from({ length: attempts }).map(() =>
+      Array.from({ length: attempts }).map((_, index) =>
         request(app)
           .post("/api/tiles/place")
           .set("Authorization", "Bearer valid-token")
           .send({
+            commandId: `cmd_room_join_load_${index.toString().padStart(2, "0")}_0001`,
             regionId: "arena-main",
             cellX: 3,
             cellY: 4,
@@ -116,7 +123,10 @@ describe("Load-focused authoritative placement and throttle paths", () => {
     expect(occupiedResponses.length).toBeGreaterThan(0);
     expect(throttledResponses.length).toBeGreaterThan(0);
     for (const response of occupiedResponses) {
-      expect(response.body).toEqual({ ok: false, reason: "occupied" });
+      expect(response.body.ok).toBe(false);
+      expect(response.body.reason).toBe("occupied");
+      expect(response.body.conflictCode).toBe("placement_conflict_idempotent");
+      expect(response.body.regionId).toBe("arena-main");
     }
     for (const response of throttledResponses) {
       expect(response.body.ok).toBe(false);

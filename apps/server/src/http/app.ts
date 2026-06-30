@@ -16,6 +16,24 @@ import { RegionSnapshotService } from "../domain/region-snapshot.service.js";
 import { RegionDiffService } from "../domain/region-diff.service.js";
 import { DEFAULT_REGION_DIFF_POLICY } from "@game/shared-types";
 import { SessionCheckpointService } from "../session/session-checkpoint.service.js";
+import { DeltaFanoutCoordinator, type DeltaFanoutConfig } from "../domain/delta-fanout.service.js";
+import type { RealtimeDeltaPayload } from "../domain/delta-fanout.service.js";
+
+/**
+ * Registry for room-scoped delta fanout coordinators indexed by regionId
+ * Allows HTTP layer and rooms to coordinate fanout dispatch
+ */
+export type DeltaFanoutRegistryEntry = {
+  coordinator: DeltaFanoutCoordinator;
+  getSubscriberIds: () => Set<string>;
+  sendToSubscriber: (subscriberId: string, payload: RealtimeDeltaPayload) => Promise<void>;
+};
+
+export type DeltaFanoutRegistry = Map<string, DeltaFanoutRegistryEntry>;
+
+export function getDeltaFanoutRegistryKey(regionId: string): string {
+  return regionId;
+}
 
 export type HttpAppDependencies = {
   readinessCheck: () => Promise<ReadinessReport>;
@@ -28,6 +46,8 @@ export type HttpAppDependencies = {
   tileRepository?: ITileRepository;
   regionSnapshotService?: RegionSnapshotService;
   regionDiffService?: RegionDiffService;
+  deltaFanoutRegistry?: DeltaFanoutRegistry;
+  deltaFanoutConfig?: DeltaFanoutConfig;
   tilePlaceThrottlePolicy?: {
     maxRequests: number;
     windowMs: number;
@@ -118,6 +138,7 @@ export function createHttpApp(dependencies: HttpAppDependencies) {
       createTileRoutes({
         placeTile: async (input) => {
           const result = await dependencies.tileRepository!.insertTile(dependencies.db!, {
+            commandId: input.commandId,
             regionId: input.regionId,
             cellX: input.cellX,
             cellY: input.cellY,
@@ -130,6 +151,15 @@ export function createHttpApp(dependencies: HttpAppDependencies) {
           });
 
           if (!result.ok) {
+            if (result.reason === "command_payload_mismatch") {
+              return {
+                ok: false as const,
+                reason: "command_payload_mismatch" as const,
+                commandId: result.commandId,
+                regionId: result.regionId
+              };
+            }
+
             await dependencies.telemetrySink.emitTilePlaceRejected(
               input.regionId,
               input.cellX,
@@ -139,7 +169,19 @@ export function createHttpApp(dependencies: HttpAppDependencies) {
             );
             return {
               ok: false as const,
-              reason: "occupied" as const
+              reason: "occupied" as const,
+              commandId: result.commandId,
+              regionId: result.regionId,
+              cell: {
+                cellX: result.error.cell_x,
+                cellY: result.error.cell_y
+              },
+              winner: {
+                ownerId: result.error.winner_owner_id ?? "unknown",
+                tileId: result.error.winner_tile_id ?? 0,
+                resolvedAt: (result.error.winner_resolved_at ?? new Date()).toISOString()
+              },
+              replayed: result.replayed
             };
           }
 
@@ -151,10 +193,39 @@ export function createHttpApp(dependencies: HttpAppDependencies) {
             input.ownerId
           );
 
+          // Dispatch fanout to subscribers in this region after successful commit
+          if (dependencies.deltaFanoutRegistry && result.tile.sequenceId) {
+            const fanoutEntry = dependencies.deltaFanoutRegistry.get(getDeltaFanoutRegistryKey(input.regionId));
+            if (fanoutEntry) {
+              // Prepare delta payload for realtime fanout
+              const deltaPayload = {
+                sequenceId: String(result.tile.sequenceId),
+                regionId: input.regionId,
+                cellX: input.cellX,
+                cellY: input.cellY,
+                offsetX: input.offsetX,
+                offsetY: input.offsetY,
+                shape: input.shape,
+                color: input.color,
+                stylePayload: input.stylePayload,
+                ownerId: input.ownerId,
+                sentAt: new Date().toISOString(),
+                retransmitAttempt: 0
+              };
+
+              await fanoutEntry.coordinator.publish(
+                fanoutEntry.getSubscriberIds(),
+                deltaPayload,
+                fanoutEntry.sendToSubscriber
+              );
+            }
+          }
+
           return {
             ok: true as const,
             tileId: result.tile.id,
-            createdAt: result.tile.createdAt
+            createdAt: result.tile.createdAt,
+            replayed: result.replayed
           };
         },
         shouldThrottleTilePlace: async ({ key, nowMs, regionId, cellX, cellY, ownerId }) => {

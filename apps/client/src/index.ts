@@ -27,3 +27,12 @@ export type {
 	ReplayChecksumInput,
 	ReplayChecksumResult
 } from "./session/replay-checksum.js";
+export {
+	RealtimeDeltaHandler,
+	createRealtimeDeltaHandler
+} from "./session/realtime-delta-handler.js";
+export type {
+	RealtimeDeltaPayload,
+	DeltaAckPayload,
+	ApplyDeltaCallback
+} from "./session/realtime-delta-handler.js";

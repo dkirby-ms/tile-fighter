@@ -242,6 +242,53 @@ jobs:
             exit 1
           fi
 
+      - name: Run E3-S4 sustained 50 CCU latency budget load
+        env:
+          LOAD_ENDPOINT: ${{ env.WS_URL }}
+          LOAD_BEARER_TOKEN: ${{ secrets.VERIFY_BEARER_TOKEN }}
+          LOAD_CCU: 50
+          LOAD_DURATION_MINUTES: 30
+          LOAD_ROOM_KEY: arena
+          LOAD_EVIDENCE_PATH: artifacts/e3-s4-latency-budget.json
+          LOAD_RUN_CLASS: release
+        run: npx vitest run apps/server/tests/load/e3-s4-latency-budget.load.ts --reporter=verbose
+
+      - name: Assert E3-S4 latency budget evidence
+        run: |
+          set -euo pipefail
+
+          node - <<'NODE'
+          const fs = require("node:fs");
+
+          const evidencePath = "artifacts/e3-s4-latency-budget.json";
+          if (!fs.existsSync(evidencePath)) {
+            throw new Error(`Missing expected evidence artifact: ${evidencePath}`);
+          }
+
+          const evidence = JSON.parse(fs.readFileSync(evidencePath, "utf8"));
+
+          if (typeof evidence.metrics?.placementAckMedianMs !== "number") {
+            throw new Error("Evidence artifact missing numeric metrics.placementAckMedianMs");
+          }
+          if (typeof evidence.metrics?.reconnectP95Ms !== "number") {
+            throw new Error("Evidence artifact missing numeric metrics.reconnectP95Ms");
+          }
+
+          const placementAck = evidence.metrics.placementAckMedianMs;
+          const reconnectP95 = evidence.metrics.reconnectP95Ms;
+
+          if (placementAck > 200) {
+            throw new Error(`E3-S4 placement ack median regression: expected <= 200ms, got ${placementAck}ms`);
+          }
+          if (reconnectP95 > 3000) {
+            throw new Error(`E3-S4 reconnect p95 regression: expected <= 3000ms, got ${reconnectP95}ms`);
+          }
+
+          process.stdout.write(
+            `E3-S4 release budget passed: placement_ack_median=${placementAck}ms reconnect_p95=${reconnectP95}ms\n`
+          );
+          NODE
+
       - name: Upload verification evidence artifacts
         uses: actions/upload-artifact@v4
         with:

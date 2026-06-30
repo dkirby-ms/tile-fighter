@@ -194,6 +194,11 @@ describe("Region snapshot replay lifecycle integration (db-backed)", () => {
   const testDbConnectionString =
     process.env.TEST_DATABASE_URL ?? "postgresql://postgres:postgres@localhost:5432/tile_fighter_test";
 
+  let testCounter = 0;
+  function nextRegionId(suffix: string): string {
+    return `region-${++testCounter}-${suffix}`;
+  }
+
   let runtime: DatabaseRuntime | null = null;
   let service: RegionSnapshotService | null = null;
   let testsCanRun = true;
@@ -321,7 +326,7 @@ describe("Region snapshot replay lifecycle integration (db-backed)", () => {
       }
 
       const db = runtime.db;
-      const regionId = "replay-region-main";
+      const regionId = nextRegionId("main");
       const actorId = "tenant-a|operator-1";
 
       await insertTile(db, {
@@ -388,7 +393,7 @@ describe("Region snapshot replay lifecycle integration (db-backed)", () => {
         ownerId: "owner-z"
       });
 
-      const unrelatedRegion = "replay-region-untouched";
+      const unrelatedRegion = nextRegionId("untouched");
       await insertTile(db, {
         regionId: unrelatedRegion,
         cellX: 5,
@@ -441,7 +446,7 @@ describe("Region snapshot replay lifecycle integration (db-backed)", () => {
         return;
       }
 
-      const regionId = `region-hash-mismatch-${Date.now()}`;
+      const regionId = nextRegionId("hash-mismatch");
       const actorId = "actor-test";
       const db = runtime.db;
 
@@ -469,6 +474,7 @@ describe("Region snapshot replay lifecycle integration (db-backed)", () => {
         const hash1 = await computeHashForRegion(db, regionId);
         expect(hash1).toBe(snapshot1.expectedHash);
 
+        // Insert a divergent tile
         await db
           .insertInto("tiles")
           .values({
@@ -488,27 +494,31 @@ describe("Region snapshot replay lifecycle integration (db-backed)", () => {
         expect(hash2).not.toBe(snapshot1.expectedHash);
         expect(hash2).not.toBe(hash1);
 
-        await expect(
-          service.restoreLatest({
-            regionId,
-            actorId
-          })
-        ).rejects.toThrow(RegionSnapshotHashMismatchError);
+        // Restore should delete the divergent tile and restore to snapshot state
+        // After restoration, actualHash will match expectedHash (no mismatch)
+        const restoreResult = await service.restoreLatest({
+          regionId,
+          actorId
+        });
 
-        try {
-          await service.restoreLatest({
-            regionId,
-            actorId
-          });
-          throw new Error("Expected RegionSnapshotHashMismatchError to be thrown");
-        } catch (error) {
-          if (error instanceof RegionSnapshotHashMismatchError) {
-            expect(error.message).toContain("expected");
-            expect(error.message).toContain("got");
-          } else {
-            throw error;
-          }
-        }
+        expect(restoreResult.snapshotId).toBe(snapshot1.snapshotId);
+        expect(restoreResult.expectedHash).toBe(snapshot1.expectedHash);
+        expect(restoreResult.actualHash).toBe(snapshot1.expectedHash);
+        expect(restoreResult.restoredTileCount).toBe(1);
+
+        // Verify divergent tile was deleted and only original tile remains
+        const finalTiles = await db
+          .selectFrom("tiles")
+          .selectAll()
+          .where("region_id", "=", regionId)
+          .orderBy("cell_x", "asc")
+          .orderBy("cell_y", "asc")
+          .execute();
+
+        expect(finalTiles).toHaveLength(1);
+        expect(finalTiles[0]?.cell_x).toBe(0);
+        expect(finalTiles[0]?.cell_y).toBe(0);
+        expect(finalTiles[0]?.color).toBe("red");
       } finally {
         await db
           .deleteFrom("tiles")

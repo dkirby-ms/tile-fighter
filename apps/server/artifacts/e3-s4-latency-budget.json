@@ -1,0 +1,25 @@
+{
+  "scenarioId": "e3-s4-latency-budget",
+  "timestamp": "2026-06-30T20:50:35.136Z",
+  "environment": {
+    "ccu": 50,
+    "durationMinutes": 0.5,
+    "runClass": "local"
+  },
+  "metrics": {
+    "placementAckMedianMs": 191,
+    "reconnectP95Ms": 51,
+    "roundsCompleted": 126,
+    "placementAckSampleCount": 5,
+    "reconnectSampleCount": 10
+  },
+  "budgets": {
+    "placementAckMedianMs": 200,
+    "reconnectP95Ms": 3000
+  },
+  "budgetStatus": {
+    "placementAckPassed": true,
+    "reconnectP95Passed": true,
+    "allPassed": true
+  }
+}

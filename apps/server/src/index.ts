@@ -4,7 +4,7 @@ import { WebSocketTransport } from "@colyseus/ws-transport";
 import { ReadinessReport } from "@game/shared-types";
 import { AuthService } from "./auth/auth-service.js";
 import { readRuntimeConfig } from "./config/env.js";
-import { createHttpApp } from "./http/app.js";
+import { createHttpApp, type DeltaFanoutRegistry } from "./http/app.js";
 import { buildAuthMiddleware } from "./http/auth-middleware.js";
 import {
   createDatabaseRuntime,
@@ -23,6 +23,7 @@ import { createRegionDiffService } from "./domain/region-diff.service.js";
 import { createSessionCheckpointRepository } from "./persistence/session-checkpoint.repository.js";
 import { SessionCheckpointService } from "./session/session-checkpoint.service.js";
 import { ReconnectTokenService } from "./auth/reconnect-token.service.js";
+import { type DeltaFanoutConfig } from "./domain/delta-fanout.service.js";
 
 async function bootstrap(): Promise<void> {
   const runtimeConfig = readRuntimeConfig();
@@ -31,7 +32,10 @@ async function bootstrap(): Promise<void> {
 
   const authService = new AuthService(runtimeConfig);
   const telemetrySink = new TelemetrySink(runtimeConfig);
-  const tileRepository = createTileRepository();
+  const tileRepository = createTileRepository({
+    telemetrySink,
+    replayWindowSeconds: runtimeConfig.placementCommandReplayWindowSeconds
+  });
   const regionSnapshotRepository = createRegionSnapshotRepository();
   const regionDiffRepository = createRegionDiffRepository();
   const regionSnapshotService = createRegionSnapshotService({
@@ -66,6 +70,15 @@ async function bootstrap(): Promise<void> {
   });
   lifecycleService.start();
 
+  // Initialize delta fanout configuration and registry for coordinating realtime deltas
+  const deltaFanoutConfig: DeltaFanoutConfig = {
+    deltaAckTimeoutMs: runtimeConfig.deltaAckTimeoutMs || 350,
+    deltaRetransmitMaxAttempts: runtimeConfig.deltaRetransmitMaxAttempts || 1,
+    deltaAckPendingTtlMs: runtimeConfig.deltaAckPendingTtlMs || 30000,
+    deltaOutboundCapPerConnection: runtimeConfig.deltaOutboundCapPerConnection || 128
+  };
+  const deltaFanoutRegistry: DeltaFanoutRegistry = new Map();
+
   const readinessCheck = async (): Promise<ReadinessReport> => {
     try {
       await verifyDatabaseConnectivity(dbRuntime.db);
@@ -98,6 +111,8 @@ async function bootstrap(): Promise<void> {
     tileRepository,
     regionSnapshotService,
     regionDiffService,
+    deltaFanoutRegistry,
+    deltaFanoutConfig,
     tilePlaceThrottlePolicy: {
       maxRequests: runtimeConfig.tilePlaceThrottleMaxRequests,
       windowMs: runtimeConfig.tilePlaceThrottleWindowMs,
@@ -115,7 +130,13 @@ async function bootstrap(): Promise<void> {
     transport: new WebSocketTransport({ server: nodeServer })
   });
 
-  gameServer.define("arena", ArenaRoom, { authService, lifecycleService });
+  gameServer.define("arena", ArenaRoom, {
+    authService,
+    lifecycleService,
+    deltaFanoutRegistry,
+    telemetrySink,
+    deltaFanoutConfig
+  });
 
   nodeServer.listen(runtimeConfig.port, () => {
     process.stdout.write(`Server listening on port ${runtimeConfig.port}\n`);

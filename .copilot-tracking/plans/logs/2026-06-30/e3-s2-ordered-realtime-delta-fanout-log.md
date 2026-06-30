@@ -49,12 +49,46 @@ Gaps and differences identified between research findings and the implementation
 
 ## Suggested Follow-On Work
 
-* WI-01: Multi-instance fanout hardening — Add Redis- or outbox-backed pending ack durability for horizontal scaling (High)
+Items identified during implementation that fall outside current scope.
+
+* WI-01: Add telemetry event helpers to telemetry-sink.ts — Required `emitDeltaSent`, `emitDeltaAcked`, `emitDeltaRetransmitted` methods for Phase 2 integration (Identified in Phase 1, COMPLETED in Phase 2)
+  * Source: Phase 1 Implementation
+  * Status: Completed
+  
+* WI-02: Enhance InsertTileResult to expose sequence ID — Return canonical sequence/version from tile mutation result for Phase 2 fanout dispatch (Identified in Phase 1, COMPLETED in Phase 2)
+  * Source: Phase 1 Implementation
+  * Status: Completed
+
+* WI-03: Enhanced Region Tracking in DeltaFanoutCoordinator — Coordinator could track region metadata per subscriber/sequence for complete telemetry analytics (Identified in Phase 2)
+  * Source: Phase 2 Implementation
+  * Dependency: Phase 2 completion, optional enhancement
+  
+* WI-04: Integration Test for Fanout Ordering — Validate sequence order preservation across subscribers, ack timeouts, and duplicate detection (Identified in Phase 2)
+  * Source: Phase 2 Implementation
+  * Dependency: Phase 4 integration test coverage
+  
+* WI-05: Load Test Configuration Tuning — Validate timeout/retransmit defaults under realistic load (Identified in Phase 2)
+  * Source: Phase 2 Implementation
+  * Dependency: Phase 4 load testing
+  
+* WI-06: Outbound Cap Enforcement Validation — Ensure cap prevents queue overflow and triggers backpressure (Identified in Phase 2)
+  * Source: Phase 2 Implementation
+  * Dependency: Phase 4 validation
+  
+* WI-07: Extend heartbeat-caller.ts integration — Consider abstracting ack transport through heartbeat-caller for consistent session transport handling (Identified in Phase 3)
+  * Source: Phase 3 Implementation
+  * Dependency: Phase 4 follow-up, optional optimization
+  
+* WI-08: Integration with bootstrap/session lifecycle — Wire RealtimeDeltaHandler into session initialization and cleanup (Identified in Phase 3)
+  * Source: Phase 3 Implementation
+  * Dependency: Phase 4 integration test coverage
+
+* WI-09: Multi-instance fanout hardening — Add Redis- or outbox-backed pending ack durability for horizontal scaling (High)
   * Source: .copilot-tracking/research/2026-06-30/e3-s2-ordered-realtime-delta-fanout-research.md
   * Dependency: E3-S2 baseline production validation complete
-* WI-02: Ack timeout tuning and adaptive policy — Replace fixed timeout default with network-profile tuning and percentile-driven thresholds (Medium)
+* WI-10: Ack timeout tuning and adaptive policy — Replace fixed timeout default with network-profile tuning and percentile-driven thresholds (Medium)
   * Source: .copilot-tracking/research/2026-06-30/e3-s2-ordered-realtime-delta-fanout-research.md
   * Dependency: Telemetry baselines from load and production-like environments
-* WI-03: Fanout observability dashboard — Build dashboard/alerts for timeout rate, retransmit ratio, and outbound cap rejects (Medium)
+* WI-11: Fanout observability dashboard — Build dashboard/alerts for timeout rate, retransmit ratio, and outbound cap rejects (Medium)
   * Source: GitHub issue #18 telemetry requirements
   * Dependency: Telemetry events emitted in stable environments

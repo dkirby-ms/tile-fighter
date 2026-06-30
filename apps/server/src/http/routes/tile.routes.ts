@@ -1,5 +1,8 @@
 import { Router } from "express";
 import {
+  TILE_PLACE_COMMAND_ID_MAX_LENGTH,
+  TILE_PLACE_COMMAND_ID_MIN_LENGTH,
+  TILE_PLACE_COMMAND_ID_PATTERN,
   TileEditCommand,
   TileEditResult,
   TilePlaceCommand,
@@ -13,6 +16,7 @@ type TilePrincipal = {
 };
 
 type PlaceTileInput = {
+  commandId: string;
   regionId: string;
   cellX: number;
   cellY: number;
@@ -25,9 +29,27 @@ type PlaceTileInput = {
 };
 
 type PlaceTileOutcome =
-  | { ok: true; tileId: number; createdAt: Date }
-  | { ok: false; reason: "occupied" }
+  | { ok: true; tileId: number; createdAt: Date; replayed?: boolean }
+  | {
+      ok: false;
+      reason: "occupied";
+      commandId: string;
+      regionId: string;
+      cell: {
+        cellX: number;
+        cellY: number;
+      };
+      winner: {
+        ownerId: string;
+        tileId: number;
+        resolvedAt: string;
+      };
+      replayed?: boolean;
+    }
+  | { ok: false; reason: "command_payload_mismatch"; commandId: string; regionId: string }
   | { ok: false; reason: "throttled"; retryAfterMs: number };
+
+const tilePlaceCommandIdRegex = new RegExp(TILE_PLACE_COMMAND_ID_PATTERN);
 
 type EditTileInput = {
   regionId: string;
@@ -79,6 +101,7 @@ function isTilePlaceCommand(body: unknown): body is TilePlaceCommand {
 
   const value = body as Record<string, unknown>;
   return (
+    typeof value.commandId === "string" &&
     typeof value.regionId === "string" &&
     Number.isInteger(value.cellX) &&
     Number.isInteger(value.cellY) &&
@@ -87,6 +110,14 @@ function isTilePlaceCommand(body: unknown): body is TilePlaceCommand {
     typeof value.shape === "string" &&
     typeof value.color === "string" &&
     "stylePayload" in value
+  );
+}
+
+function isValidTilePlaceCommandId(commandId: string): boolean {
+  return (
+    commandId.length >= TILE_PLACE_COMMAND_ID_MIN_LENGTH &&
+    commandId.length <= TILE_PLACE_COMMAND_ID_MAX_LENGTH &&
+    tilePlaceCommandIdRegex.test(commandId)
   );
 }
 
@@ -121,6 +152,14 @@ export function createTileRoutes(dependencies: TileRoutesDependencies): Router {
       return;
     }
 
+    if (!isValidTilePlaceCommandId(req.body.commandId)) {
+      res.status(400).json({
+        error: "Invalid tile placement command",
+        conflictCode: "malformed_command_identity"
+      });
+      return;
+    }
+
     const throttle = await dependencies.shouldThrottleTilePlace({
       key: `${principal.tenantScopedSubject}:${req.body.regionId}`,
       nowMs: Date.now(),
@@ -141,6 +180,7 @@ export function createTileRoutes(dependencies: TileRoutesDependencies): Router {
     }
 
     const result = await dependencies.placeTile({
+      commandId: req.body.commandId,
       regionId: req.body.regionId,
       cellX: req.body.cellX,
       cellY: req.body.cellY,
@@ -166,9 +206,26 @@ export function createTileRoutes(dependencies: TileRoutesDependencies): Router {
         return;
       }
 
+      if (result.reason === "command_payload_mismatch") {
+        const rejected: TilePlaceResult = {
+          ok: false,
+          reason: "command_payload_mismatch",
+          conflictCode: "placement_command_payload_mismatch",
+          commandId: result.commandId,
+          regionId: result.regionId
+        };
+        res.status(409).json(rejected);
+        return;
+      }
+
       const rejected: TilePlaceResult = {
         ok: false,
-        reason: "occupied"
+        reason: "occupied",
+        conflictCode: "placement_conflict_idempotent",
+        commandId: result.commandId,
+        regionId: result.regionId,
+        cell: result.cell,
+        winner: result.winner
       };
       res.status(409).json(rejected);
       return;

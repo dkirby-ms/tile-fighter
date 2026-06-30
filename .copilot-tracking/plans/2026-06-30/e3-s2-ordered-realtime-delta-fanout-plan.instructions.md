@@ -52,69 +52,69 @@ Implement ordered realtime placement fanout with single-timeout retransmit and c
 
 ## Implementation Checklist
 
-### [ ] Implementation Phase 1: Realtime Delta Protocol and Fanout Core
+### [x] Implementation Phase 1: Realtime Delta Protocol and Fanout Core
 
 <!-- parallelizable: false -->
 
-* [ ] Step 1.1: Define ordered delta and ack contracts in room/service boundaries
+* [x] Step 1.1: Define ordered delta and ack contracts in room/service boundaries
   * Details: .copilot-tracking/details/2026-06-30/e3-s2-ordered-realtime-delta-fanout-details.md (Lines 12-28)
-* [ ] Step 1.2: Implement in-memory fanout coordinator with pending ack map, timeout scheduling, and one retransmit max
+* [x] Step 1.2: Implement in-memory fanout coordinator with pending ack map, timeout scheduling, and one retransmit max
   * Details: .copilot-tracking/details/2026-06-30/e3-s2-ordered-realtime-delta-fanout-details.md (Lines 30-50)
-* [ ] Step 1.3: Validate phase changes
+* [x] Step 1.3: Validate phase changes
   * Run lint and build commands for modified files
   * Skip if validation conflicts with parallel phases
 
-### [ ] Implementation Phase 2: Server Fanout Integration and Telemetry
+### [x] Implementation Phase 2: Server Fanout Integration and Telemetry
 
 <!-- parallelizable: true -->
 
-* [ ] Step 2.1: Dispatch fanout from committed tile mutation sequence source
+* [x] Step 2.1: Dispatch fanout from committed tile mutation sequence source
   * Details: .copilot-tracking/details/2026-06-30/e3-s2-ordered-realtime-delta-fanout-details.md (Lines 64-83)
-* [ ] Step 2.2: Add room subscriber/ack handling and outbound cap enforcement
+* [x] Step 2.2: Add room subscriber/ack handling and outbound cap enforcement
   * Details: .copilot-tracking/details/2026-06-30/e3-s2-ordered-realtime-delta-fanout-details.md (Lines 85-100)
-* [ ] Step 2.3: Add required telemetry helper methods and state transition emissions
+* [x] Step 2.3: Add required telemetry helper methods and state transition emissions
   * Details: .copilot-tracking/details/2026-06-30/e3-s2-ordered-realtime-delta-fanout-details.md (Lines 102-119)
-* [ ] Step 2.4: Validate phase changes
+* [x] Step 2.4: Validate phase changes
   * Run lint and targeted server test commands
 
-### [ ] Implementation Phase 3: Client Dedupe and Ack Flow
+### [x] Implementation Phase 3: Client Dedupe and Ack Flow
 
 <!-- parallelizable: true -->
 
-* [ ] Step 3.1: Add realtime delta handler with ordered apply and sequence dedupe
+* [x] Step 3.1: Add realtime delta handler with ordered apply and sequence dedupe
   * Details: .copilot-tracking/details/2026-06-30/e3-s2-ordered-realtime-delta-fanout-details.md (Lines 133-152)
-* [ ] Step 3.2: Emit client acks after apply/dedupe decisions using deterministic policy
+* [x] Step 3.2: Emit client acks after apply/dedupe decisions using deterministic policy
   * Details: .copilot-tracking/details/2026-06-30/e3-s2-ordered-realtime-delta-fanout-details.md (Lines 154-170)
-* [ ] Step 3.3: Validate phase changes
+* [x] Step 3.3: Validate phase changes
   * Run lint and targeted client unit test commands
 
-### [ ] Implementation Phase 4: Automated Coverage and Abuse Validation
+### [x] Implementation Phase 4: Automated Coverage and Abuse Validation
 
 <!-- parallelizable: false -->
 
-* [ ] Step 4.1: Add server unit tests for fanout state transitions and retransmit cap
+* [x] Step 4.1: Add server unit tests for fanout state transitions and retransmit cap
   * Details: .copilot-tracking/details/2026-06-30/e3-s2-ordered-realtime-delta-fanout-details.md (Lines 184-199)
-* [ ] Step 4.2: Add client unit tests for duplicate dedupe and ack behavior
+* [x] Step 4.2: Add client unit tests for duplicate dedupe and ack behavior
   * Details: .copilot-tracking/details/2026-06-30/e3-s2-ordered-realtime-delta-fanout-details.md (Lines 201-219)
-* [ ] Step 4.3: Add integration test for cross-subscriber sequence ordering convergence
+* [x] Step 4.3: Add integration test for cross-subscriber sequence ordering convergence
   * Details: .copilot-tracking/details/2026-06-30/e3-s2-ordered-realtime-delta-fanout-details.md (Lines 221-237)
-* [ ] Step 4.4: Add load scenario for ack-timeout and retransmit telemetry rates
+* [x] Step 4.4: Add load scenario for ack-timeout and retransmit telemetry rates
   * Details: .copilot-tracking/details/2026-06-30/e3-s2-ordered-realtime-delta-fanout-details.md (Lines 239-254)
-* [ ] Step 4.5: Validate phase changes
+* [x] Step 4.5: Validate phase changes
   * Run server/client tests and load scope checks
 
-### [ ] Implementation Phase 5: Validation
+### [x] Implementation Phase 5: Validation
 
 <!-- parallelizable: false -->
 
-* [ ] Step 5.1: Run full project validation
+* [x] Step 5.1: Run full project validation
   * Execute all lint commands (npm run lint, language linters)
   * Execute build scripts for all modified components
   * Run test suites covering modified code
-* [ ] Step 5.2: Fix minor validation issues
+* [x] Step 5.2: Fix minor validation issues
   * Iterate on lint errors and build warnings
   * Apply fixes directly when corrections are straightforward
-* [ ] Step 5.3: Report blocking issues
+* [x] Step 5.3: Report blocking issues
   * Document issues requiring additional research
   * Provide user with next steps and recommended planning
   * Avoid large-scale fixes within this phase
