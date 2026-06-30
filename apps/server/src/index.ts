@@ -33,7 +33,8 @@ async function bootstrap(): Promise<void> {
   const authService = new AuthService(runtimeConfig);
   const telemetrySink = new TelemetrySink(runtimeConfig);
   const tileRepository = createTileRepository({
-    telemetrySink
+    telemetrySink,
+    replayWindowSeconds: runtimeConfig.placementCommandReplayWindowSeconds
   });
   const regionSnapshotRepository = createRegionSnapshotRepository();
   const regionDiffRepository = createRegionDiffRepository();

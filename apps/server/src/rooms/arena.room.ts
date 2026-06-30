@@ -5,7 +5,7 @@ import { AuthService } from "../auth/auth-service.js";
 import { SessionLifecycleService } from "../session/session-lifecycle.service.js";
 import { DeltaAckPayload, DeltaFanoutCoordinator, type DeltaFanoutConfig, type RealtimeDeltaPayload } from "../domain/delta-fanout.service.js";
 import { TelemetrySink } from "../telemetry/telemetry-sink.js";
-import { type DeltaFanoutRegistry } from "../http/app.js";
+import { getDeltaFanoutRegistryKey, type DeltaFanoutRegistry } from "../http/app.js";
 
 type ArenaRoomOptions = {
   authService: AuthService;
@@ -43,6 +43,10 @@ export class ArenaRoom extends Room<{ state: ArenaState }> {
   private deltaFanoutRegistry: DeltaFanoutRegistry | undefined;
   private telemetrySink: TelemetrySink | undefined;
 
+  public static fanoutRegistryKey(): string {
+    return getDeltaFanoutRegistryKey(ArenaRoom.ROOM_KEY);
+  }
+
   override onCreate(options: ArenaRoomOptions): void {
     this.authService = options.authService;
     this.lifecycleService = options.lifecycleService;
@@ -56,6 +60,18 @@ export class ArenaRoom extends Room<{ state: ArenaState }> {
         this.handleRetransmit.bind(this),
         this.handleAckCallback.bind(this)
       );
+
+      options.deltaFanoutRegistry.set(ArenaRoom.fanoutRegistryKey(), {
+        coordinator: this.deltaFanoutCoordinator,
+        getSubscriberIds: () => new Set(this.clients.map((client) => client.sessionId)),
+        sendToSubscriber: async (subscriberId, payload) => {
+          const targetClient = this.clients.find((client) => client.sessionId === subscriberId);
+          if (!targetClient) {
+            return;
+          }
+          targetClient.send(REALTIME_MESSAGES.DELTA, payload);
+        }
+      });
     }
 
     this.setState(new ArenaState());
@@ -102,6 +118,16 @@ export class ArenaRoom extends Room<{ state: ArenaState }> {
     // Unregister subscriber from coordinator on leave
     if (this.deltaFanoutCoordinator) {
       this.deltaFanoutCoordinator.unregisterSubscriber(client.sessionId);
+    }
+  }
+
+  override onDispose(): void {
+    if (this.deltaFanoutRegistry) {
+      this.deltaFanoutRegistry.delete(ArenaRoom.fanoutRegistryKey());
+    }
+
+    if (this.deltaFanoutCoordinator) {
+      this.deltaFanoutCoordinator.destroy();
     }
   }
 

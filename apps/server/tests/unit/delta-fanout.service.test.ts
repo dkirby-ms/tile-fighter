@@ -219,6 +219,77 @@ describe("DeltaFanoutCoordinator", () => {
 
       expect(onSendMock).toHaveBeenCalledOnce();
     });
+
+    it("recovers subscriber eligibility after outbound window reset interval", async () => {
+      vi.useFakeTimers();
+      try {
+        const resetWindowConfig: DeltaFanoutConfig = {
+          ...DEFAULT_CONFIG,
+          deltaOutboundCapPerConnection: 2,
+          deltaAckPendingTtlMs: 1_000
+        };
+        const resetWindowCoordinator = new DeltaFanoutCoordinator(
+          resetWindowConfig,
+          onRetransmitMock as OnRetransmitCallback,
+          onAckMock as OnAckCallback
+        );
+
+        try {
+          const subscribers = new Set(["sub-reset"]);
+
+          await resetWindowCoordinator.publish(subscribers, makeTestDelta("seq-1"), onSendMock);
+          await resetWindowCoordinator.publish(subscribers, makeTestDelta("seq-2"), onSendMock);
+          await resetWindowCoordinator.publish(subscribers, makeTestDelta("seq-3"), onSendMock);
+          expect(onSendMock).toHaveBeenCalledTimes(2);
+
+          vi.advanceTimersByTime(resetWindowConfig.deltaAckPendingTtlMs + 10);
+
+          await resetWindowCoordinator.publish(subscribers, makeTestDelta("seq-4"), onSendMock);
+          expect(onSendMock).toHaveBeenCalledTimes(3);
+          expect(onSendMock).toHaveBeenLastCalledWith(
+            "sub-reset",
+            expect.objectContaining({ sequenceId: "seq-4" })
+          );
+        } finally {
+          resetWindowCoordinator.destroy();
+        }
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("keeps subscriber blocked when reset interval has not elapsed", async () => {
+      vi.useFakeTimers();
+      try {
+        const resetWindowConfig: DeltaFanoutConfig = {
+          ...DEFAULT_CONFIG,
+          deltaOutboundCapPerConnection: 2,
+          deltaAckPendingTtlMs: 1_000
+        };
+        const resetWindowCoordinator = new DeltaFanoutCoordinator(
+          resetWindowConfig,
+          onRetransmitMock as OnRetransmitCallback,
+          onAckMock as OnAckCallback
+        );
+
+        try {
+          const subscribers = new Set(["sub-no-reset"]);
+
+          await resetWindowCoordinator.publish(subscribers, makeTestDelta("seq-1"), onSendMock);
+          await resetWindowCoordinator.publish(subscribers, makeTestDelta("seq-2"), onSendMock);
+          expect(onSendMock).toHaveBeenCalledTimes(2);
+
+          vi.advanceTimersByTime(resetWindowConfig.deltaAckPendingTtlMs - 100);
+
+          await resetWindowCoordinator.publish(subscribers, makeTestDelta("seq-3"), onSendMock);
+          expect(onSendMock).toHaveBeenCalledTimes(2);
+        } finally {
+          resetWindowCoordinator.destroy();
+        }
+      } finally {
+        vi.useRealTimers();
+      }
+    });
   });
 
   describe("subscriber lifecycle", () => {

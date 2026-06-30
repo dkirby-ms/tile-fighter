@@ -176,7 +176,20 @@ export class DeltaFanoutCoordinator {
       return true; // New subscriber, always allow first message
     }
 
+    this.resetOutboundWindowIfElapsed(stats);
+
     return stats.outboundCount < this.config.deltaOutboundCapPerConnection;
+  }
+
+  /**
+   * Reset outbound counters after each configured cap window interval.
+   */
+  private resetOutboundWindowIfElapsed(stats: SubscriberStats): void {
+    const elapsedMs = Date.now() - stats.windowResetAt.getTime();
+    if (elapsedMs >= this.config.deltaAckPendingTtlMs) {
+      stats.outboundCount = 0;
+      stats.windowResetAt = new Date();
+    }
   }
 
   /**

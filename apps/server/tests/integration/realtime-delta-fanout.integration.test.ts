@@ -1,4 +1,5 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
+import request from "supertest";
 import {
   DeltaFanoutCoordinator,
   type RealtimeDeltaPayload,
@@ -6,6 +7,10 @@ import {
   type OnRetransmitCallback,
   type OnAckCallback
 } from "../../src/domain/delta-fanout.service.js";
+import { createHttpApp } from "../../src/http/app.js";
+import { SessionLifecycleService } from "../../src/session/session-lifecycle.service.js";
+import { type DeltaFanoutRegistry } from "../../src/http/app.js";
+import { type TelemetrySink } from "../../src/telemetry/telemetry-sink.js";
 
 const TEST_CONFIG: DeltaFanoutConfig = {
   deltaAckTimeoutMs: 100, // Short timeout for testing
@@ -364,5 +369,142 @@ describe("Realtime Delta Fanout Integration: Cross-Subscriber Ordering", () => {
 
       expect(onAckMock).toHaveBeenCalledTimes(2);
     });
+
+    it("outbound cap policy remains stable and recovers after reset interval", async () => {
+      vi.useFakeTimers();
+      const capConfig: DeltaFanoutConfig = {
+        ...TEST_CONFIG,
+        deltaOutboundCapPerConnection: 2,
+        deltaAckPendingTtlMs: 1_000
+      };
+
+      const capCoordinator = new DeltaFanoutCoordinator(
+        capConfig,
+        onRetransmitMock as OnRetransmitCallback,
+        onAckMock as OnAckCallback
+      );
+
+      const onSend = vi.fn(async () => undefined);
+      const subscribers = new Set(["sub-stable"]);
+
+      try {
+        await capCoordinator.publish(subscribers, makeTestDelta("seq-1"), onSend);
+        await capCoordinator.publish(subscribers, makeTestDelta("seq-2"), onSend);
+        await capCoordinator.publish(subscribers, makeTestDelta("seq-3"), onSend);
+        expect(onSend).toHaveBeenCalledTimes(2);
+
+        vi.advanceTimersByTime(capConfig.deltaAckPendingTtlMs + 10);
+
+        await capCoordinator.publish(subscribers, makeTestDelta("seq-4"), onSend);
+        expect(onSend).toHaveBeenCalledTimes(3);
+      } finally {
+        capCoordinator.destroy();
+        vi.useRealTimers();
+      }
+    });
+  });
+});
+
+describe("Realtime Delta Fanout Integration: HTTP placement dispatch", () => {
+  it("publishes placement deltas to active subscribers through registry contract", async () => {
+    const publish = vi.fn(async (subscribers: Set<string>, payload: RealtimeDeltaPayload, onSend) => {
+      for (const subscriberId of subscribers) {
+        await onSend(subscriberId, payload);
+      }
+    });
+    const sendToSubscriber = vi.fn(async () => undefined);
+
+    const telemetrySink = {
+      emit: vi.fn(async () => undefined),
+      emitTilePlaceRejected: vi.fn(async () => undefined),
+      emitTilePlaceThrottled: vi.fn(async () => undefined),
+      emitTilePlaced: vi.fn(async () => undefined),
+      emitTileEdited: vi.fn(async () => undefined)
+    } as unknown as TelemetrySink;
+
+    const lifecycleService = new SessionLifecycleService({
+      heartbeatTtlSeconds: 30,
+      cleanupIntervalSeconds: 5,
+      telemetrySink
+    });
+
+    const deltaFanoutRegistry: DeltaFanoutRegistry = new Map([
+      [
+        "arena",
+        {
+          coordinator: { publish } as unknown as DeltaFanoutCoordinator,
+          getSubscriberIds: () => new Set(["sub-1", "sub-2"]),
+          sendToSubscriber
+        }
+      ]
+    ]);
+
+    const app = createHttpApp({
+      readinessCheck: async () => ({
+        ok: true,
+        checks: {
+          database: "ok",
+          config: "ok"
+        }
+      }),
+      authMiddleware: (_req, res, next) => {
+        res.locals.principal = { tenantScopedSubject: "tenant-a|player-1" };
+        next();
+      },
+      telemetrySink,
+      authService: {
+        issueJoinToken: vi.fn(),
+        verifyAccessToken: vi.fn()
+      } as never,
+      lifecycleService,
+      checkpointService: {
+        issueReconnectTokenForSubject: vi.fn(async () => "reconnect-token"),
+        resolveReconnect: vi.fn(async () => ({ ok: false, reason: "checkpoint_not_found" }))
+      } as never,
+      db: {} as never,
+      tileRepository: {
+        insertTile: vi.fn(async () => ({
+          ok: true,
+          replayed: false,
+          tile: {
+            id: 99,
+            createdAt: new Date("2026-06-30T12:00:00.000Z"),
+            sequenceId: 123
+          }
+        })),
+        editTileWithinSelfEditWindow: vi.fn(async () => ({ ok: false, reason: "forbidden_owner_mismatch" })),
+        deleteTile: vi.fn(async () => ({ ok: false, reason: "not_found" })),
+        selectTileByCoordinate: vi.fn(async () => null),
+        selectTilesByRegion: vi.fn(async () => [])
+      },
+      deltaFanoutRegistry,
+      tilePlaceThrottlePolicy: {
+        maxRequests: 100,
+        windowMs: 60_000
+      }
+    });
+
+    const response = await request(app)
+      .post("/api/tiles/place")
+      .send({
+        commandId: "cmd_integration_dispatch_01",
+        regionId: "arena",
+        cellX: 5,
+        cellY: 7,
+        offsetX: 0,
+        offsetY: 0,
+        shape: "square",
+        color: "blue",
+        stylePayload: { from: "integration" }
+      });
+
+    expect(response.status).toBe(201);
+    expect(publish).toHaveBeenCalledOnce();
+
+    const [subscriberSet] = publish.mock.calls[0] as [Set<string>, RealtimeDeltaPayload, unknown];
+    expect(Array.from(subscriberSet).sort()).toEqual(["sub-1", "sub-2"]);
+    expect(sendToSubscriber).toHaveBeenCalledTimes(2);
+    expect(sendToSubscriber).toHaveBeenCalledWith("sub-1", expect.objectContaining({ sequenceId: "123" }));
+    expect(sendToSubscriber).toHaveBeenCalledWith("sub-2", expect.objectContaining({ sequenceId: "123" }));
   });
 });

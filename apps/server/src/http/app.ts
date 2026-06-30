@@ -17,12 +17,23 @@ import { RegionDiffService } from "../domain/region-diff.service.js";
 import { DEFAULT_REGION_DIFF_POLICY } from "@game/shared-types";
 import { SessionCheckpointService } from "../session/session-checkpoint.service.js";
 import { DeltaFanoutCoordinator, type DeltaFanoutConfig } from "../domain/delta-fanout.service.js";
+import type { RealtimeDeltaPayload } from "../domain/delta-fanout.service.js";
 
 /**
  * Registry for room-scoped delta fanout coordinators indexed by regionId
  * Allows HTTP layer and rooms to coordinate fanout dispatch
  */
-export type DeltaFanoutRegistry = Map<string, DeltaFanoutCoordinator>;
+export type DeltaFanoutRegistryEntry = {
+  coordinator: DeltaFanoutCoordinator;
+  getSubscriberIds: () => Set<string>;
+  sendToSubscriber: (subscriberId: string, payload: RealtimeDeltaPayload) => Promise<void>;
+};
+
+export type DeltaFanoutRegistry = Map<string, DeltaFanoutRegistryEntry>;
+
+export function getDeltaFanoutRegistryKey(regionId: string): string {
+  return regionId;
+}
 
 export type HttpAppDependencies = {
   readinessCheck: () => Promise<ReadinessReport>;
@@ -184,8 +195,8 @@ export function createHttpApp(dependencies: HttpAppDependencies) {
 
           // Dispatch fanout to subscribers in this region after successful commit
           if (dependencies.deltaFanoutRegistry && result.tile.sequenceId) {
-            const coordinator = dependencies.deltaFanoutRegistry.get(input.regionId);
-            if (coordinator) {
+            const fanoutEntry = dependencies.deltaFanoutRegistry.get(getDeltaFanoutRegistryKey(input.regionId));
+            if (fanoutEntry) {
               // Prepare delta payload for realtime fanout
               const deltaPayload = {
                 sequenceId: String(result.tile.sequenceId),
@@ -202,14 +213,10 @@ export function createHttpApp(dependencies: HttpAppDependencies) {
                 retransmitAttempt: 0
               };
 
-              // Dispatch to all subscribers in this coordinator's registry
-              // Note: coordinator maintains its own subscriber set managed by room lifecycle
-              await coordinator.publish(
-                new Set(), // Empty set - coordinator will send to all tracked subscribers
+              await fanoutEntry.coordinator.publish(
+                fanoutEntry.getSubscriberIds(),
                 deltaPayload,
-                async () => {
-                  // onSend callback - actual sending is handled by room
-                }
+                fanoutEntry.sendToSubscriber
               );
             }
           }
