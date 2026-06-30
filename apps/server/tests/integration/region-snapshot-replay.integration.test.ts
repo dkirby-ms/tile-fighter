@@ -18,11 +18,6 @@ import { createRegionSnapshotRepository } from "../../src/persistence/region-sna
 import { computeRegionHash } from "../../src/domain/region-hash.js";
 
 describe("Region snapshot replay integration", () => {
-  let testCounter = 0;
-  function nextRegionId(suffix: string): string {
-    return `region-${++testCounter}-${suffix}`;
-  }
-
   function createLifecycleService(telemetrySink: TelemetrySink): SessionLifecycleService {
     return new SessionLifecycleService({
       heartbeatTtlSeconds: 30,
