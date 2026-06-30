@@ -46,54 +46,54 @@ Adopt SemVer for tile-fighter monorepo packages through Changesets-driven releas
 
 ## Implementation Checklist
 
-### [ ] Implementation Phase 1: SemVer Policy and Tooling Bootstrap
+### [x] Implementation Phase 1: SemVer Policy and Tooling Bootstrap
 
 <!-- parallelizable: false -->
 
-* [ ] Step 1.1: Define SemVer policy for package scope, app scope, pre-1.0 behavior, and tag strategy
+* [x] Step 1.1: Define SemVer policy for package scope, app scope, pre-1.0 behavior, and tag strategy
   * Details: .copilot-tracking/details/2026-06-30/semver-adoption-details.md (Lines 12-28)
-* [ ] Step 1.2: Install and configure Changesets for independent workspace versioning
+* [x] Step 1.2: Install and configure Changesets for independent workspace versioning
   * Details: .copilot-tracking/details/2026-06-30/semver-adoption-details.md (Lines 31-52)
-* [ ] Step 1.3: Validate phase changes
+* [x] Step 1.3: Validate phase changes
   * Run lint and build commands for modified files
   * Skip if validation conflicts with parallel phases
 
-### [ ] Implementation Phase 2: Workspace Dependency and CI Guardrails
+### [x] Implementation Phase 2: Workspace Dependency and CI Guardrails
 
 <!-- parallelizable: false -->
 
-* [ ] Step 2.1: Update internal dependency protocol from file: to workspace:*
+* [x] Step 2.1: Update internal dependency protocol from file: to workspace:*
   * Details: .copilot-tracking/details/2026-06-30/semver-adoption-details.md (Lines 66-81)
-* [ ] Step 2.2: Add CI checks enforcing changeset presence for release-impacting changes
+* [x] Step 2.2: Add CI checks enforcing changeset presence for release-impacting changes
   * Details: .copilot-tracking/details/2026-06-30/semver-adoption-details.md (Lines 83-103)
-* [ ] Step 2.3: Add commit/PR-title policy enforcement aligned with SemVer bump intent
+* [x] Step 2.3: Add commit/PR-title policy enforcement aligned with SemVer bump intent
   * Details: .copilot-tracking/details/2026-06-30/semver-adoption-details.md (Lines 105-118)
-* [ ] Step 2.4: Validate phase changes
+* [x] Step 2.4: Validate phase changes
   * Run lint and targeted server build commands
 
-### [ ] Implementation Phase 3: Release Workflow and Documentation
+### [x] Implementation Phase 3: Release Workflow and Documentation
 
 <!-- parallelizable: false -->
 
-* [ ] Step 3.1: Add SemVer release workflow using changesets/action on main
+* [x] Step 3.1: Add SemVer release workflow using changesets/action on main
   * Details: .copilot-tracking/details/2026-06-30/semver-adoption-details.md (Lines 124-145)
-* [ ] Step 3.2: Document release PR lifecycle, tag interpretation, and rollback path
+* [x] Step 3.2: Document release PR lifecycle, tag interpretation, and rollback path
   * Details: .copilot-tracking/details/2026-06-30/semver-adoption-details.md (Lines 147-163)
-* [ ] Step 3.3: Validate phase changes
+* [x] Step 3.3: Validate phase changes
   * Run lint and test commands for workflow/documentation updates
 
-### [ ] Implementation Phase 4: Validation
+### [x] Implementation Phase 4: Validation
 
 <!-- parallelizable: false -->
 
-* [ ] Step 4.1: Run full project validation
+* [x] Step 4.1: Run full project validation
   * Execute all lint commands (npm run lint, language linters)
   * Execute build scripts for all modified components
   * Run test suites covering modified code
-* [ ] Step 4.2: Fix minor validation issues
+* [x] Step 4.2: Fix minor validation issues
   * Iterate on lint errors and build warnings
   * Apply fixes directly when corrections are straightforward
-* [ ] Step 4.3: Report blocking issues
+* [x] Step 4.3: Report blocking issues
   * Document issues requiring additional research
   * Provide user with next steps and recommended planning
   * Avoid large-scale fixes within this phase

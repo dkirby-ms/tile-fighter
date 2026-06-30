@@ -7,11 +7,18 @@ Gaps and differences identified between research findings and the implementation
 
 ### Unaddressed Research Items
 
-* None currently identified.
+* None.
 
 ### Plan Deviations from Research
 
-* None currently identified.
+* None.
+
+### Implementation Deviations
+
+* DD-01: Commit intent enforcement implemented via PR title policy in CI.
+  * Plan specifies: Add commit/PR-title policy enforcement aligned with SemVer bump intent.
+  * Implementation differs: Enforced PR title format in CI as the primary mechanism.
+  * Rationale: PR title checks are reliable for squash and merge workflows and align with release review intent.
 
 ## Implementation Paths Considered
 
@@ -38,9 +45,9 @@ Gaps and differences identified between research findings and the implementation
 * WI-01: Enable external package publication path — Add npm trusted publishing/OIDC and package access policies for selected shared packages (Medium)
   * Source: .copilot-tracking/research/2026-06-30/semver-adoption-research.md
   * Dependency: Stable release-PR workflow and maintainer approval process
-* WI-02: Conventional Commits enforcement — Add PR title or commit lint enforcement to improve bump predictability (Medium)
-  * Source: .copilot-tracking/research/2026-06-30/semver-adoption-research.md
-  * Dependency: SemVer policy documentation merged
 * WI-03: Release telemetry and dashboarding — Add reporting for release cadence, bump types, and changeset compliance rates (Low)
   * Source: .copilot-tracking/research/2026-06-30/semver-adoption-research.md
   * Dependency: Two or more release cycles completed
+* WI-04: End-to-end SemVer release workflow drill — Merge a test changeset on main to verify release PR creation, merge semantics, and tag outputs (Medium)
+  * Source: Phase 3 completion report
+  * Dependency: Repository workflow permissions and branch protection confirmation

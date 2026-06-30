@@ -11,9 +11,13 @@
     "dev": "npm run -w @game/server dev",
     "build": "tsc -b",
     "lint": "npm run --workspaces lint",
-    "test": "npm run --workspaces test"
+    "test": "npm run --workspaces test",
+    "version-packages": "changeset version",
+    "release": "changeset publish",
+    "changeset-status": "changeset status"
   },
   "devDependencies": {
+    "@changesets/cli": "^2.29.6",
     "@eslint/js": "^9.39.0",
     "@types/node": "^22.10.2",
     "@typescript-eslint/eslint-plugin": "^8.62.0",

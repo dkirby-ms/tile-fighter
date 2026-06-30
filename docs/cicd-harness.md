@@ -16,6 +16,49 @@ estimated_reading_time: 8
 
 The deployment harness uses GitHub Actions workflows in [.github/workflows/ci.yml](.github/workflows/ci.yml), [.github/workflows/release-dev.yml](.github/workflows/release-dev.yml), and [.github/workflows/release-prod.yml](.github/workflows/release-prod.yml).
 
+## SemVer Policy
+
+SemVer is used for repository package version signals, while deployment identity remains commit SHA based.
+
+Scope:
+
+- `packages/*` is the primary SemVer surface. Use `fix` for patch changes, `feat` for minor changes, and breaking API changes for major changes.
+- `apps/*` remains private deployment units. App package versions are metadata for local workspace consistency and do not replace SHA deployment identity.
+- The deployment workflows in release-dev and release-prod continue to tag container images by commit SHA.
+
+Pre-1.0 behavior:
+
+- Until `1.0.0`, treat `0.y.z` as unstable and document breaking changes clearly in release notes.
+- When introducing a breaking change before `1.0.0`, increment the minor version and include explicit migration notes.
+
+Tag strategy:
+
+- SemVer tags are generated from release version updates for package change tracking.
+- SHA tags remain the source of truth for deployed container artifact identity.
+- SemVer tags and SHA deployment tags are complementary and are used together, not as replacements.
+
+## SemVer Release PR Runbook
+
+Release PR lifecycle on `main`:
+
+1. A change that affects release output includes a changeset file.
+2. Push to `main` triggers `.github/workflows/semver-release.yml`.
+3. The workflow opens or updates a release PR containing package version and changelog updates.
+4. Maintainers review and merge the release PR to create SemVer tags.
+5. Existing `.github/workflows/release-dev.yml` and `.github/workflows/release-prod.yml` continue to deploy immutable SHA-tagged images.
+
+Tag interpretation:
+
+- SemVer tags represent package-level API/version milestones.
+- SHA tags represent immutable deployable container artifacts.
+- Incident triage should reference both: SemVer for change intent, SHA for deployed instance identity.
+
+Rollback for mistaken changeset or package bump:
+
+1. Before merge, update or delete the incorrect changeset in a follow-up PR.
+2. After merge but before deployment, create a corrective changeset PR and process the next release PR.
+3. After deployment, perform Azure Container Apps revision rollback (documented below), then ship the corrective changeset PR.
+
 ## Secret Source of Truth
 
 The selected model is GitHub Environments secrets as the single source of truth for deployment-time secrets.

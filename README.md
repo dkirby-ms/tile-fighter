@@ -74,6 +74,49 @@ npm run -w @game/server migrate:down
 
 Deployment and release policy details are documented in [docs/cicd-harness.md](docs/cicd-harness.md).
 
+## Versioning and Release Signals
+
+This repository uses SemVer for package change tracking and commit SHA tags for deployment artifact identity.
+
+- `packages/*` is the primary SemVer surface for API compatibility and release notes.
+- `apps/*` stays private and deploys by immutable SHA-based image tags.
+- Pre-1.0 (`0.y.z`) changes are treated as unstable, and breaking changes must be called out with migration notes.
+- SemVer tags and SHA deployment tags are complementary and both are required for full release traceability.
+
+## SemVer Release PR Lifecycle
+
+SemVer release automation is handled by `.github/workflows/semver-release.yml` on `main`.
+
+1. Contributors add a changeset file for release-impacting changes.
+2. Pushes to `main` update or create a release PR with pending version and changelog changes.
+3. Maintainers review and merge the release PR.
+4. Merge creates SemVer tags for versioned packages.
+5. Deployment remains on SHA-tagged images through the existing dev/prod workflows.
+
+Tag interpretation:
+
+- SemVer tags (for example `@game/shared-types@0.2.0`) identify package API/version history.
+- SHA tags (for example `${GITHUB_SHA}` in release workflows) identify the exact deployed container artifact.
+- Use SemVer tags to reason about package compatibility and SHA tags to reason about deployed runtime state.
+
+Rollback path for mistaken changeset or version bump:
+
+1. If the release PR is still open, remove or correct the bad changeset and let the release PR refresh.
+2. If the release PR is merged but not deployed, submit a correcting follow-up changeset and merge the next release PR.
+3. If deployment already happened, use the rollback steps in `docs/cicd-harness.md` to restore the previous healthy revision, then apply a correcting changeset PR.
+
+See the SemVer policy and operational details in [docs/cicd-harness.md](docs/cicd-harness.md).
+
+## Pull Request Title Policy
+
+Pull request titles must follow a Conventional Commit-style format so CI can validate SemVer intent:
+
+- `fix(scope): summary`
+- `feat(scope): summary`
+- `feat(scope)!: summary` for breaking intent
+
+Accepted types: `feat`, `fix`, `chore`, `docs`, `refactor`, `perf`, `test`, `build`, `ci`, `style`, `revert`.
+
 ## Tests
 
 All integration tests **require** `TEST_DATABASE_URL` to be set. This is enforced in both local development and CI to ensure consistent test coverage.

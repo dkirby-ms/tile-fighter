@@ -41,6 +41,40 @@ jobs:
       - name: Install dependencies
         run: npm ci --workspaces --include-workspace-root
 
+      - name: Validate PR title SemVer intent
+        if: github.event_name == 'pull_request'
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          if ! echo "$PR_TITLE" | grep -Eq '^(feat|fix|chore|docs|refactor|perf|test|build|ci|style|revert)(\([^)]+\))?(!)?: .+'; then
+            echo "PR title must follow Conventional Commit format (for example: feat(server): add reconnect token endpoint)"
+            exit 1
+          fi
+
+      - name: Require changeset for release-impacting changes
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          CHANGED_FILES="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")"
+          echo "$CHANGED_FILES"
+
+          if ! echo "$CHANGED_FILES" | grep -Eq '^(packages/|apps/server/)'; then
+            echo "No release-impacting files changed; skipping changeset requirement"
+            exit 0
+          fi
+
+          ADDED_CHANGESETS="$(git diff --diff-filter=A --name-only "$BASE_SHA" "$HEAD_SHA" | grep -E '^\.changeset/.+\.md$' || true)"
+          if [[ -n "$ADDED_CHANGESETS" ]]; then
+            echo "Changeset file detected"
+            exit 0
+          fi
+
+          echo "Release-impacting changes require a changeset file in .changeset/*.md"
+          echo "For no-release updates, add an empty changeset with no packages listed and a short rationale"
+          exit 1
+
       - name: Dependency audit (high and above)
         run: npm audit --audit-level=high
 
