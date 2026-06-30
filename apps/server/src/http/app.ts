@@ -40,6 +40,7 @@ export type HttpAppDependencies = {
 
 export function createHttpApp(dependencies: HttpAppDependencies) {
   const app = express();
+  const appWithCleanup = app as typeof app & { _throttleCleanupInterval?: ReturnType<typeof setInterval> };
   app.disable("x-powered-by");
 
   const tilePlaceThrottlePolicy = dependencies.tilePlaceThrottlePolicy ?? {
@@ -79,18 +80,15 @@ export function createHttpApp(dependencies: HttpAppDependencies) {
   const cleanupIntervalMs = 60 * 60 * 1000; // 1 hour
   const cleanupInterval = setInterval(() => {
     const now = Date.now();
-    let cleanedCount = 0;
     for (const [key, entry] of tilePlacementThrottleByKey) {
       if (now - entry.lastActivityMs > tilePlaceThrottleTtlMs) {
         tilePlacementThrottleByKey.delete(key);
-        cleanedCount++;
       }
     }
-    // Optionally log: console.debug(`[TilePlacement] Throttle cleanup: removed ${cleanedCount} stale entries`);
   }, cleanupIntervalMs);
 
   // Clean up interval on graceful shutdown
-  (app as any)._throttleCleanupInterval = cleanupInterval;
+  appWithCleanup._throttleCleanupInterval = cleanupInterval;
 
   app.use(express.json());
   app.use(createHealthRoutes(dependencies.readinessCheck));
