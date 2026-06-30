@@ -97,6 +97,15 @@ export class SessionLifecycleService {
     return this.presenceBySubject.get(tenantScopedSubject);
   }
 
+  isRegionMember(tenantScopedSubject: string, regionId: string): boolean {
+    const presence = this.presenceBySubject.get(tenantScopedSubject);
+    if (!presence) {
+      return false;
+    }
+
+    return presence.roomId === regionId;
+  }
+
   getPresenceCount(): number {
     return this.presenceBySubject.size;
   }

@@ -54,65 +54,65 @@ Implement durable tile occupancy schema with deterministic conflict handling, re
 
 ## Implementation Checklist
 
-### [ ] Implementation Phase 1: Schema and Migration
+### [x] Implementation Phase 1: Schema and Migration
 
 <!-- parallelizable: false -->
 
-* [ ] Step 1.1: Create tiles table migration
+* [x] Step 1.1: Create tiles table migration
   * Details: .copilot-tracking/details/2026-06-29/tile-persistence-schema-constraints-details.md (Lines 15-60)
-  * File: apps/server/src/persistence/migrations/<next>_tiles.js
-* [ ] Step 1.2: Extend ServerDatabase typing
+  * File: apps/server/src/persistence/migrations/1720000000000_tiles.js
+* [x] Step 1.2: Extend ServerDatabase typing
   * Details: .copilot-tracking/details/2026-06-29/tile-persistence-schema-constraints-details.md (Lines 65-95)
   * File: apps/server/src/persistence/db.ts
-* [ ] Step 1.3: Validate schema and migration
+* [x] Step 1.3: Validate schema and migration
   * Run database migration in local dev environment
   * Verify table structure: `\d tiles` in psql
   * Verify indexes: `\di tiles*` in psql
   * Verify constraints: `\d tiles` includes region_coordinate_unique and offset range checks
 
-### [ ] Implementation Phase 2: Repository Implementation
+### [x] Implementation Phase 2: Repository Implementation
 
 <!-- parallelizable: true -->
 
-* [ ] Step 2.1: Implement tile repository
+* [x] Step 2.1: Implement tile repository
   * Details: .copilot-tracking/details/2026-06-29/tile-persistence-schema-constraints-details.md (Lines 100-145)
   * File: apps/server/src/persistence/tile.repository.ts
-* [ ] Step 2.2: Add tile repository exports
+* [x] Step 2.2: Add tile repository exports
   * Details: .copilot-tracking/details/2026-06-29/tile-persistence-schema-constraints-details.md (Lines 150-155)
   * File: apps/server/src/persistence/db.ts (exports section)
-* [ ] Step 2.3: Validate phase changes
+* [x] Step 2.3: Validate phase changes
   * Run `npm run lint --filter=server` in apps/server
   * Run `npm run build --filter=server` in apps/server
   * Skip full test execution; unit/integration tests run in Phase 3
 
-### [ ] Implementation Phase 3: Telemetry Integration
+### [x] Implementation Phase 3: Telemetry Integration
 
 <!-- parallelizable: true -->
 
-* [ ] Step 3.1: Add tile telemetry events
+* [x] Step 3.1: Add tile telemetry events
   * Details: .copilot-tracking/details/2026-06-29/tile-persistence-schema-constraints-details.md (Lines 160-175)
   * File: apps/server/src/telemetry/telemetry-sink.ts
-* [ ] Step 3.2: Update tile repository to emit telemetry
+* [x] Step 3.2: Update tile repository to emit telemetry
   * Details: .copilot-tracking/details/2026-06-29/tile-persistence-schema-constraints-details.md (Lines 180-190)
   * File: apps/server/src/persistence/tile.repository.ts (telemetry integration)
-* [ ] Step 3.3: Validate phase changes
+* [x] Step 3.3: Validate phase changes
   * Run `npm run lint --filter=server` in apps/server
   * Run `npm run build --filter=server` in apps/server
 
-### [ ] Implementation Phase 4: Test Coverage
+### [x] Implementation Phase 4: Test Coverage
 
 <!-- parallelizable: false -->
 
-* [ ] Step 4.1: Unit tests for tile repository
+* [x] Step 4.1: Unit tests for tile repository
   * Details: .copilot-tracking/details/2026-06-29/tile-persistence-schema-constraints-details.md (Lines 195-240)
   * File: apps/server/tests/unit/tile.repository.test.ts
-* [ ] Step 4.2: Integration tests for tile persistence
+* [x] Step 4.2: Integration tests for tile persistence
   * Details: .copilot-tracking/details/2026-06-29/tile-persistence-schema-constraints-details.md (Lines 245-295)
   * File: apps/server/tests/integration/tile-persistence.integration.test.ts
-* [ ] Step 4.3: Startup migration smoke test
+* [x] Step 4.3: Startup migration smoke test
   * Details: .copilot-tracking/details/2026-06-29/tile-persistence-schema-constraints-details.md (Lines 300-325)
   * File: apps/server/tests/integration/startup-migration.smoke.test.ts
-* [ ] Step 4.4: Validate test coverage
+* [x] Step 4.4: Validate test coverage
   * Run `npm run test --filter=server` in apps/server
   * All tile-related tests should pass
   * Verify migration smoke test succeeds
@@ -125,25 +125,26 @@ Implement durable tile occupancy schema with deterministic conflict handling, re
   * Details: .copilot-tracking/details/2026-06-29/tile-persistence-schema-constraints-details.md (Lines 330-345)
   * File: packages/shared-types/src/index.ts
   * Rationale: Only required if tile contracts are shared across client and server; deferred if tile endpoints remain server-internal for v0
+  * **SKIPPED**: Tile endpoints remain server-internal for v0; shared types deferred until HTTP routes are implemented
 * [ ] Step 5.2: Validate shared types
   * Run `npm run build --filter=shared-types`
 
-### [ ] Implementation Phase 6: Final Validation
+### [x] Implementation Phase 6: Final Validation
 
 <!-- parallelizable: false -->
 
-* [ ] Step 6.1: Run full project validation
+* [x] Step 6.1: Run full project validation
   * Execute `npm run lint` at workspace root
   * Execute `npm run build` at workspace root
   * Execute `npm run test` at workspace root
-* [ ] Step 6.2: Fix minor validation issues
+* [x] Step 6.2: Fix minor validation issues
   * Iterate on lint errors and build warnings
   * Apply fixes directly when corrections are straightforward
-* [ ] Step 6.3: Report blocking issues
+* [x] Step 6.3: Report blocking issues
   * Document issues requiring additional research
   * Provide user with next steps and recommended planning
   * Avoid large-scale fixes within this phase
-* [ ] Step 6.4: Verify migration executes cleanly
+* [x] Step 6.4: Verify migration executes cleanly
   * Start local dev database
   * Run migrations in order
   * Confirm tiles table exists with all constraints and indexes

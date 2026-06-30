@@ -14,8 +14,8 @@ export default defineConfig({
     }
   },
   test: {
-    dir: fileURLToPath(new URL("tests", import.meta.url)),
     root: rootDir,
-    environment: "node"
+    environment: "node",
+    include: ["tests/**/*.{test,spec}.?(c|m)[jt]s?(x)", "tests/load/**/*.ts"]
   }
 });

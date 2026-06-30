@@ -10,6 +10,23 @@ jobs:
   validate:
     name: Lint, test, and build
     runs-on: ubuntu-latest
+    env:
+      TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/tile_fighter_test
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/tile_fighter_test
+    services:
+      postgres:
+        image: postgres:18.4-alpine
+        env:
+          POSTGRES_DB: tile_fighter_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d tile_fighter_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
 
     steps:
       - name: Checkout
@@ -29,6 +46,25 @@ jobs:
 
       - name: Lint
         run: npm run lint
+
+      - name: Verify integration DB precondition
+        run: |
+          if [ -z "$TEST_DATABASE_URL" ]; then
+            echo "TEST_DATABASE_URL is required for DB-backed integration suites in CI"
+            exit 1
+          fi
+
+      - name: Wait for PostgreSQL
+        run: |
+          for i in {1..30}; do
+            if pg_isready -h localhost -p 5432 -U postgres -d tile_fighter_test; then
+              exit 0
+            fi
+            sleep 2
+          done
+
+          echo "PostgreSQL did not become ready in time"
+          exit 1
 
       - name: Test
         run: npm run test

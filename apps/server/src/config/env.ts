@@ -26,7 +26,13 @@ const envSchema = z.object({
   JOIN_TOKEN_SIGNING_SECRET: z.string().min(32),
   JOIN_TOKEN_TTL_SECONDS: z.coerce.number().int().positive().max(120).default(120),
   SESSION_HEARTBEAT_TTL_SECONDS: z.coerce.number().int().positive().default(30),
-  SESSION_CLEANUP_INTERVAL_SECONDS: z.coerce.number().int().positive().default(10)
+  SESSION_CLEANUP_INTERVAL_SECONDS: z.coerce.number().int().positive().default(10),
+  TILE_PLACE_THROTTLE_MAX_REQUESTS: z.coerce.number().int().positive().default(5),
+  TILE_PLACE_THROTTLE_WINDOW_MS: z.coerce.number().int().positive().default(60_000),
+  TILE_PLACE_THROTTLE_TTL_MS: z.coerce.number().int().positive().default(24 * 60 * 60 * 1000),
+  REGION_DIFF_DEFAULT_MAX_TILES: z.coerce.number().int().positive().default(500),
+  REGION_DIFF_MAX_TILES_PER_REQUEST: z.coerce.number().int().positive().default(1_000),
+  REGION_DIFF_MAX_VIEWPORT_AREA: z.coerce.number().int().positive().default(10_000)
 });
 
 export type RuntimeConfig = {
@@ -49,6 +55,12 @@ export type RuntimeConfig = {
   joinTokenTtlSeconds: number;
   sessionHeartbeatTtlSeconds: number;
   sessionCleanupIntervalSeconds: number;
+  tilePlaceThrottleMaxRequests: number;
+  tilePlaceThrottleWindowMs: number;
+  tilePlaceThrottleTtlMs: number;
+  regionDiffDefaultMaxTiles: number;
+  regionDiffMaxTilesPerRequest: number;
+  regionDiffMaxViewportArea: number;
 };
 
 function splitCsv(input?: string): string[] {
@@ -88,6 +100,12 @@ export function readRuntimeConfig(): RuntimeConfig {
     joinTokenSigningSecret: parsed.JOIN_TOKEN_SIGNING_SECRET,
     joinTokenTtlSeconds: parsed.JOIN_TOKEN_TTL_SECONDS,
     sessionHeartbeatTtlSeconds: parsed.SESSION_HEARTBEAT_TTL_SECONDS,
-    sessionCleanupIntervalSeconds: parsed.SESSION_CLEANUP_INTERVAL_SECONDS
+    sessionCleanupIntervalSeconds: parsed.SESSION_CLEANUP_INTERVAL_SECONDS,
+    tilePlaceThrottleMaxRequests: parsed.TILE_PLACE_THROTTLE_MAX_REQUESTS,
+    tilePlaceThrottleWindowMs: parsed.TILE_PLACE_THROTTLE_WINDOW_MS,
+    tilePlaceThrottleTtlMs: parsed.TILE_PLACE_THROTTLE_TTL_MS,
+    regionDiffDefaultMaxTiles: parsed.REGION_DIFF_DEFAULT_MAX_TILES,
+    regionDiffMaxTilesPerRequest: parsed.REGION_DIFF_MAX_TILES_PER_REQUEST,
+    regionDiffMaxViewportArea: parsed.REGION_DIFF_MAX_VIEWPORT_AREA
   };
 }

@@ -11,10 +11,15 @@ import {
   verifyDatabaseConnectivity,
   closeDatabaseRuntime
 } from "./persistence/db.js";
+import { createTileRepository } from "./persistence/tile.repository.js";
+import { createRegionSnapshotRepository } from "./persistence/region-snapshot.repository.js";
+import { createRegionDiffRepository } from "./persistence/region-diff.repository.js";
 import { ArenaRoom } from "./rooms/arena.room.js";
 import { registerGracefulShutdown } from "./shutdown/graceful-shutdown.js";
 import { TelemetrySink } from "./telemetry/telemetry-sink.js";
 import { SessionLifecycleService } from "./session/session-lifecycle.service.js";
+import { createRegionSnapshotService } from "./domain/region-snapshot.service.js";
+import { createRegionDiffService } from "./domain/region-diff.service.js";
 
 async function bootstrap(): Promise<void> {
   const runtimeConfig = readRuntimeConfig();
@@ -23,6 +28,19 @@ async function bootstrap(): Promise<void> {
 
   const authService = new AuthService(runtimeConfig);
   const telemetrySink = new TelemetrySink(runtimeConfig);
+  const tileRepository = createTileRepository();
+  const regionSnapshotRepository = createRegionSnapshotRepository();
+  const regionDiffRepository = createRegionDiffRepository();
+  const regionSnapshotService = createRegionSnapshotService({
+    db: dbRuntime.db,
+    repository: regionSnapshotRepository,
+    telemetrySink
+  });
+  const regionDiffService = createRegionDiffService({
+    db: dbRuntime.db,
+    repository: regionDiffRepository,
+    telemetrySink
+  });
   const lifecycleService = new SessionLifecycleService({
     heartbeatTtlSeconds: runtimeConfig.sessionHeartbeatTtlSeconds,
     cleanupIntervalSeconds: runtimeConfig.sessionCleanupIntervalSeconds,
@@ -56,7 +74,21 @@ async function bootstrap(): Promise<void> {
     authMiddleware: buildAuthMiddleware(authService),
     telemetrySink,
     authService,
-    lifecycleService
+    lifecycleService,
+    db: dbRuntime.db,
+    tileRepository,
+    regionSnapshotService,
+    regionDiffService,
+    tilePlaceThrottlePolicy: {
+      maxRequests: runtimeConfig.tilePlaceThrottleMaxRequests,
+      windowMs: runtimeConfig.tilePlaceThrottleWindowMs,
+      ttlMs: runtimeConfig.tilePlaceThrottleTtlMs
+    },
+    regionDiffLimits: {
+      defaultMaxTiles: runtimeConfig.regionDiffDefaultMaxTiles,
+      maxTilesPerRequest: runtimeConfig.regionDiffMaxTilesPerRequest,
+      maxViewportArea: runtimeConfig.regionDiffMaxViewportArea
+    }
   });
 
   const nodeServer = http.createServer(app);

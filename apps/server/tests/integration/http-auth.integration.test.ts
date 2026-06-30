@@ -5,6 +5,7 @@ import { buildAuthMiddleware } from "../../src/http/auth-middleware.js";
 import { TelemetrySink } from "../../src/telemetry/telemetry-sink.js";
 import { SessionLifecycleService } from "../../src/session/session-lifecycle.service.js";
 import { ArenaRoom } from "../../src/rooms/arena.room.js";
+import { OperatorClaimContract } from "@game/shared-types";
 
 describe("HTTP auth integration", () => {
   function createLifecycleService(telemetrySink: TelemetrySink): SessionLifecycleService {
@@ -210,5 +211,228 @@ describe("HTTP auth integration", () => {
     expect(response.body.roomId).toBe(ArenaRoom.ROOM_KEY);
     expect(response.body.joinToken).toBe("signed-join-token");
     expect(authService.issueJoinToken).toHaveBeenCalledWith("tenant-a|player-1", ArenaRoom.ROOM_KEY);
+  });
+
+  it("returns forbidden on operator route when principal lacks operator authorization", async () => {
+    const authService = {
+      verifyAccessToken: vi.fn(async () => ({
+        subject: "player-1",
+        tenantScopedSubject: "tenant-a|player-1",
+        issuer: "https://issuer.example",
+        audience: "api://tile-fighter-server",
+        tenantId: "tenant-a",
+        tokenVersion: "2.0",
+        expiresAt: 1_900_000_000,
+        roles: ["Player"]
+      })),
+      issueJoinToken: vi.fn()
+    };
+
+    const app = createHttpApp({
+      readinessCheck: async () => ({
+        ok: true,
+        checks: {
+          database: "ok",
+          config: "ok"
+        }
+      }),
+      authMiddleware: buildAuthMiddleware(authService as never),
+      authService: authService as never,
+      telemetrySink: {
+        emit: vi.fn(async () => undefined)
+      } as unknown as TelemetrySink,
+      lifecycleService: createLifecycleService({ emit: vi.fn(async () => undefined) } as unknown as TelemetrySink),
+      regionSnapshotService: {
+        createSnapshot: vi.fn(async () => ({
+          snapshotId: "snapshot-1",
+          expectedHash: "hash-1",
+          tileCount: 0
+        })),
+        restoreLatest: vi.fn(async () => ({
+          snapshotId: "snapshot-1",
+          expectedHash: "hash-1",
+          actualHash: "hash-1",
+          restoredTileCount: 0
+        }))
+      } as never
+    });
+
+    const response = await request(app)
+      .post("/api/admin/snapshots/restore-latest")
+      .set("Authorization", "Bearer valid-token")
+      .send({ regionId: "arena" });
+
+    expect(response.status).toBe(403);
+    expect(response.body).toEqual({ error: "Forbidden" });
+  });
+
+  it("allows transitional scope fallback for operator route when configured", async () => {
+    const authService = {
+      verifyAccessToken: vi.fn(async () => ({
+        subject: "player-1",
+        tenantScopedSubject: "tenant-a|player-1",
+        issuer: "https://issuer.example",
+        audience: "api://tile-fighter-server",
+        tenantId: "tenant-a",
+        tokenVersion: "2.0",
+        expiresAt: 1_900_000_000,
+        roles: ["Player"],
+        scp: "ops"
+      })),
+      issueJoinToken: vi.fn()
+    };
+
+    const operatorContract: OperatorClaimContract = {
+      source: "roles_with_scope_fallback",
+      roleValues: ["operator", "ops", "admin"],
+      scopeValues: ["ops", "admin"]
+    };
+
+    const regionSnapshotService = {
+      createSnapshot: vi.fn(async () => ({
+        snapshotId: "snapshot-1",
+        expectedHash: "hash-1",
+        tileCount: 0
+      })),
+      restoreLatest: vi.fn(async () => ({
+        snapshotId: "snapshot-1",
+        expectedHash: "hash-1",
+        actualHash: "hash-1",
+        restoredTileCount: 0
+      }))
+    };
+
+    const app = createHttpApp({
+      readinessCheck: async () => ({
+        ok: true,
+        checks: {
+          database: "ok",
+          config: "ok"
+        }
+      }),
+      authMiddleware: buildAuthMiddleware(authService as never, operatorContract),
+      authService: authService as never,
+      telemetrySink: {
+        emit: vi.fn(async () => undefined)
+      } as unknown as TelemetrySink,
+      lifecycleService: createLifecycleService({ emit: vi.fn(async () => undefined) } as unknown as TelemetrySink),
+      regionSnapshotService: regionSnapshotService as never
+    });
+
+    const response = await request(app)
+      .post("/api/admin/snapshots/restore-latest")
+      .set("Authorization", "Bearer valid-token")
+      .send({ regionId: "arena" });
+
+    expect(response.status).toBe(200);
+    expect(regionSnapshotService.restoreLatest).toHaveBeenCalledOnce();
+  });
+
+  it("returns forbidden on snapshot create when principal lacks operator authorization", async () => {
+    const authService = {
+      verifyAccessToken: vi.fn(async () => ({
+        subject: "player-1",
+        tenantScopedSubject: "tenant-a|player-1",
+        issuer: "https://issuer.example",
+        audience: "api://tile-fighter-server",
+        tenantId: "tenant-a",
+        tokenVersion: "2.0",
+        expiresAt: 1_900_000_000,
+        roles: ["Player"]
+      })),
+      issueJoinToken: vi.fn()
+    };
+
+    const app = createHttpApp({
+      readinessCheck: async () => ({
+        ok: true,
+        checks: {
+          database: "ok",
+          config: "ok"
+        }
+      }),
+      authMiddleware: buildAuthMiddleware(authService as never),
+      authService: authService as never,
+      telemetrySink: {
+        emit: vi.fn(async () => undefined)
+      } as unknown as TelemetrySink,
+      lifecycleService: createLifecycleService({ emit: vi.fn(async () => undefined) } as unknown as TelemetrySink),
+      regionSnapshotService: {
+        createSnapshot: vi.fn(async () => ({
+          snapshotId: "snapshot-1",
+          expectedHash: "hash-1",
+          tileCount: 0
+        })),
+        restoreLatest: vi.fn(async () => ({
+          snapshotId: "snapshot-1",
+          expectedHash: "hash-1",
+          actualHash: "hash-1",
+          restoredTileCount: 0
+        }))
+      } as never
+    });
+
+    const response = await request(app)
+      .post("/api/admin/snapshots/create")
+      .set("Authorization", "Bearer valid-token")
+      .send({ regionId: "arena" });
+
+    expect(response.status).toBe(403);
+    expect(response.body).toEqual({ error: "Forbidden" });
+  });
+
+  it("allows snapshot create when principal has operator authorization via roles", async () => {
+    const authService = {
+      verifyAccessToken: vi.fn(async () => ({
+        subject: "player-1",
+        tenantScopedSubject: "tenant-a|player-1",
+        issuer: "https://issuer.example",
+        audience: "api://tile-fighter-server",
+        tenantId: "tenant-a",
+        tokenVersion: "2.0",
+        expiresAt: 1_900_000_000,
+        roles: ["operator"]
+      })),
+      issueJoinToken: vi.fn()
+    };
+
+    const regionSnapshotService = {
+      createSnapshot: vi.fn(async () => ({
+        snapshotId: "snapshot-1",
+        expectedHash: "hash-1",
+        tileCount: 0
+      })),
+      restoreLatest: vi.fn(async () => ({
+        snapshotId: "snapshot-1",
+        expectedHash: "hash-1",
+        actualHash: "hash-1",
+        restoredTileCount: 0
+      }))
+    };
+
+    const app = createHttpApp({
+      readinessCheck: async () => ({
+        ok: true,
+        checks: {
+          database: "ok",
+          config: "ok"
+        }
+      }),
+      authMiddleware: buildAuthMiddleware(authService as never),
+      authService: authService as never,
+      telemetrySink: {
+        emit: vi.fn(async () => undefined)
+      } as unknown as TelemetrySink,
+      lifecycleService: createLifecycleService({ emit: vi.fn(async () => undefined) } as unknown as TelemetrySink),
+      regionSnapshotService: regionSnapshotService as never
+    });
+
+    const response = await request(app)
+      .post("/api/admin/snapshots/create")
+      .set("Authorization", "Bearer valid-token")
+      .send({ regionId: "arena" });
+
+    expect(response.status).toBe(201);
+    expect(regionSnapshotService.createSnapshot).toHaveBeenCalledOnce();
   });
 });

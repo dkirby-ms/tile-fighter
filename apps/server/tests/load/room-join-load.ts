@@ -1,241 +1,170 @@
-import { config as loadDotEnv } from "dotenv";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-import { Client } from "@colyseus/sdk";
-import { spawn } from "node:child_process";
-import { mkdir, writeFile } from "node:fs/promises";
+import request from "supertest";
+import { describe, expect, it, vi } from "vitest";
+import { createHttpApp } from "../../src/http/app.js";
+import { buildAuthMiddleware } from "../../src/http/auth-middleware.js";
+import { TelemetrySink } from "../../src/telemetry/telemetry-sink.js";
+import { SessionLifecycleService } from "../../src/session/session-lifecycle.service.js";
+import { Kysely } from "kysely";
+import { ServerDatabase } from "../../src/persistence/db.js";
+import { TileRepository } from "../../src/persistence/tile.repository.js";
 
-const runtimeEnvPath = resolve(dirname(fileURLToPath(import.meta.url)), "../../../../.env");
-loadDotEnv({ path: runtimeEnvPath });
-
-const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
-const REQUIRED_SERVER_ENV = [
-  "DATABASE_URL",
-  "ENTRA_ISSUER",
-  "ENTRA_AUDIENCE",
-  "ENTRA_JWKS_URL",
-  "TENANT_MODE"
-] as const;
-
-type LocalServerHandle = {
-  stop: () => Promise<void>;
-};
-
-function toHttpUrl(endpoint: string): URL {
-  const parsed = new URL(endpoint);
-  if (parsed.protocol === "wss:") {
-    parsed.protocol = "https:";
-  } else if (parsed.protocol === "ws:") {
-    parsed.protocol = "http:";
-  }
-  return parsed;
-}
-
-function shouldAutoStartServer(endpoint: string): boolean {
-  if (process.env.LOAD_AUTOSTART_SERVER === "false") {
-    return false;
-  }
-
-  const parsed = toHttpUrl(endpoint);
-  return LOCAL_HOSTS.has(parsed.hostname);
-}
-
-function getMissingServerEnv(): string[] {
-  return REQUIRED_SERVER_ENV.filter((key) => {
-    const value = process.env[key];
-    return !value || value.trim().length === 0;
-  });
-}
-
-async function waitForHealth(healthUrl: string, timeoutMs = 30000): Promise<void> {
-  const startedAt = Date.now();
-  let lastError = "unknown error";
-
-  while (Date.now() - startedAt < timeoutMs) {
-    try {
-      const response = await fetch(healthUrl);
-      if (response.ok) {
-        return;
-      }
-
-      lastError = `status ${response.status}`;
-    } catch (error) {
-      lastError = (error as Error).message;
-    }
-
-    await new Promise((resolve) => setTimeout(resolve, 500));
-  }
-
-  throw new Error(`Timed out waiting for local server health at ${healthUrl}: ${lastError}`);
-}
-
-function tailLines(lines: string[], max = 20): string {
-  return lines.slice(-max).join("\n");
-}
-
-async function startLocalServer(endpoint: string): Promise<LocalServerHandle> {
-  const missingEnv = getMissingServerEnv();
-  if (missingEnv.length > 0) {
-    throw new Error(
-      `Cannot auto-start local server. Missing required env vars: ${missingEnv.join(", ")}`
-    );
-  }
-
-  const parsed = toHttpUrl(endpoint);
-  const port = parsed.port || "3000";
-  const healthUrl = `${parsed.origin}/healthz`;
-  const output: string[] = [];
-
-  const serverProcess = spawn("npm", ["run", "-w", "@game/server", "dev"], {
-    env: {
-      ...process.env,
-      PORT: port
-    },
-    stdio: ["ignore", "pipe", "pipe"]
-  });
-
-  serverProcess.stdout?.on("data", (chunk: Buffer) => {
-    output.push(chunk.toString());
-  });
-  serverProcess.stderr?.on("data", (chunk: Buffer) => {
-    output.push(chunk.toString());
-  });
-
-  try {
-    await waitForHealth(healthUrl);
-  } catch (error) {
-    if (serverProcess.exitCode === null) {
-      serverProcess.kill("SIGTERM");
-    }
-
-    const logs = tailLines(output);
-    throw new Error(`${(error as Error).message}\nServer logs:\n${logs}`);
-  }
-
+function createAuthService(subject: string) {
   return {
-    stop: async () => {
-      if (serverProcess.exitCode !== null) {
-        return;
-      }
-
-      serverProcess.kill("SIGTERM");
-
-      await new Promise<void>((resolve) => {
-        const timeout = setTimeout(() => {
-          if (serverProcess.exitCode === null) {
-            serverProcess.kill("SIGKILL");
-          }
-          resolve();
-        }, 10000);
-
-        serverProcess.once("exit", () => {
-          clearTimeout(timeout);
-          resolve();
-        });
-      });
-    }
+    verifyAccessToken: vi.fn(async () => ({
+      subject,
+      tenantScopedSubject: `tenant-a|${subject}`,
+      issuer: "https://issuer.example",
+      audience: "api://tile-fighter-server",
+      tenantId: "tenant-a",
+      tokenVersion: "2.0",
+      expiresAt: 1_900_000_000
+    })),
+    issueJoinToken: vi.fn()
   };
 }
 
-async function runLoadScenario(): Promise<void> {
-  const endpoint = process.env.LOAD_ENDPOINT ?? "ws://localhost:3000";
-  const joinCount = Number.parseInt(process.env.LOAD_JOIN_COUNT ?? "25", 10);
-  const token = process.env.LOAD_BEARER_TOKEN ?? "replace-me";
-  const joinTokenPath = process.env.LOAD_JOIN_TOKEN_PATH ?? "/api/session/join-token";
-  const bootstrapPath = process.env.LOAD_BOOTSTRAP_PATH ?? "/api/session/bootstrap";
-  const roomKey = process.env.LOAD_ROOM_KEY ?? "arena";
-  const evidencePath = process.env.LOAD_EVIDENCE_PATH;
-  let localServer: LocalServerHandle | undefined;
+describe("Load-focused authoritative placement and throttle paths", () => {
+  it("simulates placement contention on one coordinate with deterministic occupied rejections", async () => {
+    const telemetrySink = {
+      emit: vi.fn(async () => undefined),
+      emitTilePlaceRejected: vi.fn(async () => undefined),
+      emitTilePlaced: vi.fn(async () => undefined),
+      emitTileEdited: vi.fn(async () => undefined),
+      emitTilePlaceThrottled: vi.fn(async () => undefined)
+    } as unknown as TelemetrySink;
 
-  if (shouldAutoStartServer(endpoint)) {
-    process.stdout.write(`Auto-starting local server for load test at ${endpoint}\n`);
-    localServer = await startLocalServer(endpoint);
-  }
-
-  const httpUrl = toHttpUrl(endpoint);
-  const joinDurationsMs: number[] = [];
-  const joinedRooms = [];
-
-  try {
-    for (let i = 0; i < joinCount; i += 1) {
-      const bootstrapStartedAt = Date.now();
-      const bootstrapResponse = await fetch(`${httpUrl.origin}${bootstrapPath}`, {
-        headers: {
-          Authorization: `Bearer ${token}`
+    let inserted = false;
+    const tileRepository = {
+      insertTile: vi.fn(async () => {
+        if (!inserted) {
+          inserted = true;
+          return {
+            ok: true as const,
+            tile: {
+              id: 101,
+              createdAt: new Date("2026-06-29T12:00:00.000Z")
+            }
+          };
         }
-      });
-      if (!bootstrapResponse.ok) {
-        throw new Error(`Bootstrap request failed with status ${bootstrapResponse.status}`);
-      }
 
-      const joinTokenResponse = await fetch(`${httpUrl.origin}${joinTokenPath}`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ roomId: roomKey })
-      });
-      if (!joinTokenResponse.ok) {
-        throw new Error(`Join-token request failed with status ${joinTokenResponse.status}`);
-      }
-      const joinTokenPayload = (await joinTokenResponse.json()) as {
-        joinToken?: string;
-      };
-      if (!joinTokenPayload.joinToken) {
-        throw new Error("Join-token response missing joinToken");
-      }
+        return {
+          ok: false as const,
+          reason: "coordinate_conflict" as const,
+          error: {
+            type: "coordinate_conflict" as const,
+            region_id: "arena-main",
+            cell_x: 3,
+            cell_y: 4
+          }
+        };
+      }),
+      editTileWithinSelfEditWindow: vi.fn(async () => ({
+        ok: false as const,
+        reason: "forbidden_owner_mismatch" as const
+      }))
+    } as unknown as TileRepository;
 
-      const client = new Client(endpoint);
-      const room = await client.joinOrCreate(roomKey, { joinToken: joinTokenPayload.joinToken });
-      joinedRooms.push(room);
-      joinDurationsMs.push(Date.now() - bootstrapStartedAt);
-    }
+    const app = createHttpApp({
+      readinessCheck: async () => ({
+        ok: true,
+        checks: {
+          database: "ok",
+          config: "ok"
+        }
+      }),
+      authMiddleware: buildAuthMiddleware(createAuthService("player-1") as never),
+      telemetrySink,
+      authService: createAuthService("player-1") as never,
+      lifecycleService: new SessionLifecycleService({
+        heartbeatTtlSeconds: 30,
+        cleanupIntervalSeconds: 5,
+        telemetrySink
+      }),
+      db: {} as Kysely<ServerDatabase>,
+      tileRepository
+    });
 
-    for (const room of joinedRooms) {
-      room.send("ping", { at: Date.now() });
-    }
-
-    const sortedDurations = [...joinDurationsMs].sort((a, b) => a - b);
-    const p50Index = Math.max(0, Math.floor((sortedDurations.length - 1) * 0.5));
-    const p50Ms = sortedDurations[p50Index] ?? 0;
-    const elapsedMs = sortedDurations.reduce((acc, value) => acc + value, 0);
-
-    const evidence = {
-      endpoint,
-      roomKey,
-      samples: joinDurationsMs.length,
-      startBoundary: "token-ready",
-      endBoundary: "bootstrap-success-plus-room-join",
-      p50Ms,
-      averageMs: joinDurationsMs.length > 0 ? Math.round(elapsedMs / joinDurationsMs.length) : 0,
-      durationsMs: joinDurationsMs
-    };
-
-    process.stdout.write(
-      `Load scenario finished: joined ${joinedRooms.length} rooms at ${endpoint}; p50=${p50Ms}ms from token-ready to playable shell\n`
+    const attempts = 12;
+    const responses = await Promise.all(
+      Array.from({ length: attempts }).map(() =>
+        request(app)
+          .post("/api/tiles/place")
+          .set("Authorization", "Bearer valid-token")
+          .send({
+            regionId: "arena-main",
+            cellX: 3,
+            cellY: 4,
+            offsetX: 0,
+            offsetY: 0,
+            shape: "square",
+            color: "red",
+            stylePayload: { hotSpot: true }
+          })
+      )
     );
 
-    if (evidencePath) {
-      const slashIndex = evidencePath.lastIndexOf("/");
-      if (slashIndex > 0) {
-        await mkdir(evidencePath.slice(0, slashIndex), { recursive: true });
-      }
-      await writeFile(evidencePath, `${JSON.stringify(evidence, null, 2)}\n`, "utf8");
-      process.stdout.write(`Wrote load evidence artifact to ${evidencePath}\n`);
+    const createdResponses = responses.filter((response) => response.status === 201);
+    const occupiedResponses = responses.filter((response) => response.status === 409);
+    const throttledResponses = responses.filter((response) => response.status === 429);
+
+    expect(createdResponses).toHaveLength(1);
+    expect(occupiedResponses.length + throttledResponses.length).toBe(attempts - 1);
+    expect(occupiedResponses.length).toBeGreaterThan(0);
+    expect(throttledResponses.length).toBeGreaterThan(0);
+    for (const response of occupiedResponses) {
+      expect(response.body).toEqual({ ok: false, reason: "occupied" });
+    }
+    for (const response of throttledResponses) {
+      expect(response.body.ok).toBe(false);
+      expect(response.body.reason).toBe("throttled");
+      expect(typeof response.body.retryAfterMs).toBe("number");
+      expect(response.body.retryAfterMs).toBeGreaterThan(0);
     }
 
-    await Promise.all(
-      joinedRooms.map(async (room) => {
-        await room.leave();
-      })
-    );
-  } finally {
-    await localServer?.stop();
-  }
-}
+    expect(tileRepository.insertTile).toHaveBeenCalledTimes(createdResponses.length + occupiedResponses.length);
+  });
 
-runLoadScenario().catch((error) => {
-  process.stderr.write(`Load scenario failed: ${(error as Error).message}\n`);
-  process.exit(1);
+  it("exercises high-rate heartbeat throttle path under load", async () => {
+    const telemetrySink = {
+      emit: vi.fn(async () => undefined)
+    } as unknown as TelemetrySink;
+
+    const authService = createAuthService("player-throttle");
+    const lifecycleService = new SessionLifecycleService({
+      heartbeatTtlSeconds: 30,
+      cleanupIntervalSeconds: 5,
+      telemetrySink
+    });
+
+    const app = createHttpApp({
+      readinessCheck: async () => ({
+        ok: true,
+        checks: {
+          database: "ok",
+          config: "ok"
+        }
+      }),
+      authMiddleware: buildAuthMiddleware(authService as never),
+      telemetrySink,
+      authService: authService as never,
+      lifecycleService
+    });
+
+    const burst = 40;
+    const responses = await Promise.all(
+      Array.from({ length: burst }).map(() =>
+        request(app)
+          .post("/api/session/heartbeat")
+          .set("Authorization", "Bearer valid-token")
+          .send({ roomId: "arena-1" })
+      )
+    );
+
+    const accepted = responses.filter((response) => response.status === 202);
+    const throttled = responses.filter((response) => response.status === 429);
+
+    expect(accepted.length).toBeGreaterThan(0);
+    expect(throttled.length).toBeGreaterThan(0);
+    expect(throttled[0].body.error).toBe("Heartbeat rate limit exceeded");
+  });
 });
