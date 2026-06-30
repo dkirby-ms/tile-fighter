@@ -34,7 +34,9 @@ Alternate model:
 
 Dev and prod release workflows both require this exact naming contract in GitHub environment secrets:
 
-- `AZURE_CREDENTIALS`
+- `AZURE_CLIENT_ID`
+- `AZURE_TENANT_ID`
+- `AZURE_SUBSCRIPTION_ID`
 - `AZURE_RESOURCE_GROUP`
 - `ACR_LOGIN_SERVER`
 - `ACR_NAME`
