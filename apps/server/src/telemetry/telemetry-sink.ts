@@ -408,4 +408,77 @@ export class TelemetrySink {
       timestamp: new Date().toISOString()
     });
   }
+
+  /**
+   * Emit load_run_started when a sustained load scenario begins.
+   */
+  async emitLoadRunStarted(input: {
+    scenarioId: string;
+    ccu: number;
+    durationMinutes: number;
+    runClass: string;
+    evidencePath: string;
+  }): Promise<void> {
+    await this.emit("load_run_started", {
+      scenario_id: input.scenarioId,
+      ccu: input.ccu,
+      duration_minutes: input.durationMinutes,
+      run_class: input.runClass,
+      evidence_path: input.evidencePath,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  /**
+   * Emit load_run_completed when a sustained load scenario finishes.
+   * Records measured percentiles, sample counts, and whether all budgets passed.
+   */
+  async emitLoadRunCompleted(input: {
+    scenarioId: string;
+    ccu: number;
+    durationMinutes: number;
+    runClass: string;
+    evidencePath: string;
+    placementAckMedianMs: number;
+    reconnectP95Ms: number;
+    roundsCompleted: number;
+    placementSampleCount: number;
+    reconnectSampleCount: number;
+    budgetPassed: boolean;
+  }): Promise<void> {
+    await this.emit("load_run_completed", {
+      scenario_id: input.scenarioId,
+      ccu: input.ccu,
+      duration_minutes: input.durationMinutes,
+      run_class: input.runClass,
+      evidence_path: input.evidencePath,
+      placement_ack_median_ms: input.placementAckMedianMs,
+      reconnect_p95_ms: input.reconnectP95Ms,
+      rounds_completed: input.roundsCompleted,
+      placement_sample_count: input.placementSampleCount,
+      reconnect_sample_count: input.reconnectSampleCount,
+      budget_passed: input.budgetPassed,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  /**
+   * Emit load_budget_violation when a measured metric exceeds its configured threshold.
+   */
+  async emitLoadBudgetViolation(input: {
+    scenarioId: string;
+    metricName: string;
+    measuredMs: number;
+    budgetMs: number;
+    runClass: string;
+  }): Promise<void> {
+    await this.emit("load_budget_violation", {
+      scenario_id: input.scenarioId,
+      metric_name: input.metricName,
+      measured_ms: input.measuredMs,
+      budget_ms: input.budgetMs,
+      run_class: input.runClass,
+      timestamp: new Date().toISOString()
+    });
+  }
 }

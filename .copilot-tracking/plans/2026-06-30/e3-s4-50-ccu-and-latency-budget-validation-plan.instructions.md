@@ -46,50 +46,50 @@ Add a dedicated sustained load-validation path that measures 50 CCU placement ac
 
 ## Implementation Checklist
 
-### [ ] Implementation Phase 1: Build Sustained 50 CCU Evidence Harness
+### [x] Implementation Phase 1: Build Sustained 50 CCU Evidence Harness
 
 <!-- parallelizable: false -->
 
-* [ ] Step 1.1: Add a dedicated E3-S4 sustained load runner with environment-driven CCU, duration, and artifact output parameters
+* [x] Step 1.1: Add a dedicated E3-S4 sustained load runner with environment-driven CCU, duration, and artifact output parameters
   * Details: .copilot-tracking/details/2026-06-30/e3-s4-50-ccu-and-latency-budget-validation-details.md (Lines 8-40)
-* [ ] Step 1.2: Measure placement ack median and reconnect p95 inside the load runner and serialize percentile evidence for workflow consumption
+* [x] Step 1.2: Measure placement ack median and reconnect p95 inside the load runner and serialize percentile evidence for workflow consumption
   * Details: .copilot-tracking/details/2026-06-30/e3-s4-50-ccu-and-latency-budget-validation-details.md (Lines 42-71)
-* [ ] Step 1.3: Add focused harness validation for the new load scenario
+* [x] Step 1.3: Add focused harness validation for the new load scenario
   * Details: .copilot-tracking/details/2026-06-30/e3-s4-50-ccu-and-latency-budget-validation-details.md (Lines 73-84)
 
-### [ ] Implementation Phase 2: Add Load Telemetry and Synthetic Credential Guardrails
+### [x] Implementation Phase 2: Add Load Telemetry and Synthetic Credential Guardrails
 
 <!-- parallelizable: false -->
 
-* [ ] Step 2.1: Extend telemetry helpers to emit load-run started, load-run completed, and latency-budget violation events
+* [x] Step 2.1: Extend telemetry helpers to emit load-run started, load-run completed, and latency-budget violation events
   * Details: .copilot-tracking/details/2026-06-30/e3-s4-50-ccu-and-latency-budget-validation-details.md (Lines 88-118)
-* [ ] Step 2.2: Ensure the load harness tags synthetic credential provenance and avoids mixing release verification credentials with scheduled nonprod load secrets
+* [x] Step 2.2: Ensure the load harness tags synthetic credential provenance and avoids mixing release verification credentials with scheduled nonprod load secrets
   * Details: .copilot-tracking/details/2026-06-30/e3-s4-50-ccu-and-latency-budget-validation-details.md (Lines 120-148)
-* [ ] Step 2.3: Validate telemetry and guardrail changes without widening to full workflow execution
+* [x] Step 2.3: Validate telemetry and guardrail changes without widening to full workflow execution
   * Details: .copilot-tracking/details/2026-06-30/e3-s4-50-ccu-and-latency-budget-validation-details.md (Lines 150-161)
 
-### [ ] Implementation Phase 3: Gate Nonprod and Release Verification on Budget Evidence
+### [x] Implementation Phase 3: Gate Nonprod and Release Verification on Budget Evidence
 
 <!-- parallelizable: true -->
 
-* [ ] Step 3.1: Update scheduled nonprod load workflow to run the sustained E3-S4 scenario with explicit 50 CCU evidence settings
+* [x] Step 3.1: Update scheduled nonprod load workflow to run the sustained E3-S4 scenario with explicit 50 CCU evidence settings
   * Details: .copilot-tracking/details/2026-06-30/e3-s4-50-ccu-and-latency-budget-validation-details.md (Lines 165-194)
-* [ ] Step 3.2: Extend verify-release workflow to read the new E3-S4 evidence artifact and fail when placement ack median or reconnect p95 exceed budget
+* [x] Step 3.2: Extend verify-release workflow to read the new E3-S4 evidence artifact and fail when placement ack median or reconnect p95 exceed budget
   * Details: .copilot-tracking/details/2026-06-30/e3-s4-50-ccu-and-latency-budget-validation-details.md (Lines 196-225)
-* [ ] Step 3.3: Update CI/CD harness documentation for the new evidence artifact, thresholds, and secret expectations
+* [x] Step 3.3: Update CI/CD harness documentation for the new evidence artifact, thresholds, and secret expectations
   * Details: .copilot-tracking/details/2026-06-30/e3-s4-50-ccu-and-latency-budget-validation-details.md (Lines 227-243)
 
-### [ ] Implementation Phase 4: Final Validation
+### [x] Implementation Phase 4: Final Validation
 
 <!-- parallelizable: false -->
 
-* [ ] Step 4.1: Run server lint, targeted load tests, and workflow-adjacent artifact validation commands
+* [x] Step 4.1: Run server lint, targeted load tests, and workflow-adjacent artifact validation commands
   * Execute `npm run -w @game/server lint`
   * Execute `npm run -w @game/server test:load`
   * Execute a local artifact assertion command against the generated E3-S4 evidence JSON
-* [ ] Step 4.2: Fix minor validation issues discovered in the harness, telemetry, or workflow scripts
+* [x] Step 4.2: Fix minor validation issues discovered in the harness, telemetry, or workflow scripts
   * Iterate on lint, test, and artifact assertion failures when the fixes stay within the planned E3-S4 slice
-* [ ] Step 4.3: Report blocking issues that require further research or infrastructure support
+* [x] Step 4.3: Report blocking issues that require further research or infrastructure support
   * Document sustained-run blockers such as unavailable synthetic credentials, flaky timing boundaries, or missing telemetry sink endpoints
 
 ## Planning Log

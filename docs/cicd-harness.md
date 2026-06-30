@@ -124,6 +124,7 @@ Verification checks:
 - `GET /api/session/bootstrap` succeeds from a token-ready caller state and returns shell-init retry policy.
 - Authenticated room-join smoke succeeds through the existing `npm run -w @game/server test:load` harness.
 - Verification run asserts room-membership authority remains in Colyseus room lifecycle hooks.
+- E3-S4 sustained 50 CCU latency budget validation passes both blocking thresholds (see E3-S4 Latency Budget Gate section).
 
 Required environment secrets for verification:
 
@@ -143,6 +144,87 @@ Verification token provenance requirements:
 - The verification token must be minted by the dedicated External ID tenant used for player auth.
 - The verification token must target the game API audience (`api://tile-fighter-server`).
 - The provenance record must include issuing tenant, token minting path, and test-player source.
+
+## E3-S4 Latency Budget Gate
+
+Story E3-S4 adds a dedicated sustained load validation step to both scheduled non-production load runs and release verification. The gate enforces two budget dimensions.
+
+### Budget thresholds
+
+| Metric | Threshold | Evidence field |
+|--------|-----------|----------------|
+| Placement acknowledgement median | ≤ 200 ms | `metrics.placementAckMedianMs` |
+| Reconnect p95 | ≤ 3 000 ms | `metrics.reconnectP95Ms` |
+
+### Evidence artifact
+
+The load runner writes `artifacts/e3-s4-latency-budget.json` with this shape:
+
+```json
+{
+  "scenarioId": "e3-s4-latency-budget",
+  "timestamp": "<ISO-8601>",
+  "environment": {
+    "ccu": 50,
+    "durationMinutes": 30,
+    "runClass": "release"
+  },
+  "metrics": {
+    "placementAckMedianMs": 42,
+    "reconnectP95Ms": 180,
+    "roundsCompleted": 14,
+    "placementAckSampleCount": 700,
+    "reconnectSampleCount": 700
+  },
+  "budgets": {
+    "placementAckMedianMs": 200,
+    "reconnectP95Ms": 3000
+  },
+  "budgetStatus": {
+    "placementAckPassed": true,
+    "reconnectP95Passed": true,
+    "allPassed": true
+  }
+}
+```
+
+### Environment variables for the load runner
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `LOAD_CCU` | Concurrent users per round | `50` |
+| `LOAD_DURATION_MINUTES` | Sustained run duration | `0.5` (local), `30` (CI) |
+| `LOAD_EVIDENCE_PATH` | JSON artifact output path | `artifacts/e3-s4-latency-budget.json` |
+| `LOAD_ROOM_KEY` | Room identifier for requests | `arena` |
+| `LOAD_RUN_CLASS` | Provenance label for telemetry | `local` |
+
+### Synthetic credential separation
+
+Two distinct secret classes serve the two run contexts. Never substitute one for the other.
+
+| Workflow | Bearer secret | Run class label |
+|----------|---------------|-----------------|
+| Scheduled nonprod load (`nonprod-load.yml`) | `NONPROD_LOAD_BEARER_TOKEN` | `nonprod` |
+| Release verification (`verify-release.yml`) | `VERIFY_BEARER_TOKEN` | `release` |
+
+The `LOAD_RUN_CLASS` environment variable tags telemetry and artifact metadata so operators can distinguish scheduled runs from release verification runs in dashboards and post-incident queries.
+
+### Nonprod load secret contract
+
+Non-production load runs require these additional secrets in the `dev` environment:
+
+- `NONPROD_WS_ENDPOINT`
+- `NONPROD_LOAD_BEARER_TOKEN`
+
+### Triage guide for E3-S4 failures
+
+When the E3-S4 budget assertion fails in release verification:
+
+1. Download the `verify-release-evidence-<run-id>` artifact from the Actions run.
+2. Open `e3-s4-latency-budget.json` and compare `metrics` values against `budgets` thresholds.
+3. Check whether `budgetStatus.placementAckPassed` or `budgetStatus.reconnectP95Passed` is false to identify the failing dimension.
+4. Confirm server health via `/healthz` and `/readyz` before attributing the failure to the application.
+5. Decide rollback based on consistent multi-run evidence of regression rather than a single outlier run.
 
 ## Rollback Procedure
 
