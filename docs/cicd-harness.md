@@ -34,7 +34,9 @@ Alternate model:
 
 Dev and prod release workflows both require this exact naming contract in GitHub environment secrets:
 
-- `AZURE_CREDENTIALS`
+- `AZURE_CLIENT_ID`
+- `AZURE_TENANT_ID`
+- `AZURE_SUBSCRIPTION_ID`
 - `AZURE_RESOURCE_GROUP`
 - `ACR_LOGIN_SERVER`
 - `ACR_NAME`
@@ -49,6 +51,36 @@ Dev and prod release workflows both require this exact naming contract in GitHub
 - `TELEMETRY_SINK_NAME`
 
 Secrets are injected only at deploy time through `az deployment group create --parameters ...` overrides.
+
+## GitHub OIDC Setup (Azure)
+
+Release workflows authenticate to Azure with GitHub OpenID Connect (OIDC) using `azure/login@v2` and these environment secrets:
+
+- `AZURE_CLIENT_ID`
+- `AZURE_TENANT_ID`
+- `AZURE_SUBSCRIPTION_ID`
+
+The login audience must be `api://AzureADTokenExchange`.
+
+### Federated Credential Subjects
+
+Create one federated identity credential per release environment on the Microsoft Entra application/service principal used by GitHub Actions.
+
+For this repository, configure:
+
+- `repo:dkirby-ms/tile-fighter:environment:dev`
+- `repo:dkirby-ms/tile-fighter:environment:prod`
+
+These subjects align with the workflow job environments (`environment: dev` and `environment: prod`).
+
+### Minimum Azure RBAC for Release Jobs
+
+Grant the OIDC service principal enough permissions to push images and deploy infrastructure:
+
+- `AcrPush` on the target Azure Container Registry.
+- `Contributor` on the deployment resource group used by `az deployment group create`.
+
+If governance requires stricter scope, replace broad `Contributor` with a least-privilege custom role that still permits the resource operations performed by the Bicep deployment.
 
 ## Bicep Parameter Contract
 
