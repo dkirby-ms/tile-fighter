@@ -182,6 +182,7 @@ async function bootstrap(): Promise<void> {
   const app = createHttpApp({
     readinessCheck,
     authMiddleware: buildAuthMiddleware(authService),
+    enableDevAuthRoutes: runtimeConfig.devAuthMode === "allow",
     telemetrySink,
     authService,
     lifecycleService,

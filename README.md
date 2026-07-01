@@ -19,6 +19,7 @@ This repository now contains a workspace-based TypeScript monorepo focused on ba
 ## Workspace Layout
 
 - apps/server: Colyseus 0.17 authoritative game server with HTTP health/auth endpoints
+- apps/web: Browser host shell for playable localhost validation and manual UAT
 - apps/tools: Optional helper scripts package for local automation
 - packages/shared-types: Shared runtime and DTO typings
 - packages/shared-auth: Shared JWT validation helpers
@@ -46,6 +47,8 @@ Start the server locally from the root workspace:
 npm run dev
 ```
 
+`npm run dev` starts both the server and browser host. Open the printed web URL (default <http://localhost:5173>) to run the playable shell.
+
 ## Local Setup
 
 1. Copy root `.env.example` values into your local environment.
@@ -62,6 +65,34 @@ docker compose up -d postgres
    - `ENTRA_JWKS_URL`: the tenant JWKS endpoint.
    - `ENTRA_CLIENT_ID`: the browser shell app registration client ID used by MSAL.
 5. Start the server package in dev mode.
+
+### Local Browser Host With Dev Auth
+
+For local manual UAT without external IdP dependency, enable development auth mode.
+
+1. Set these values in `.env`:
+
+```bash
+DEV_AUTH_MODE=allow
+DEV_AUTH_SHARED_SECRET=choose-a-local-secret-value
+```
+
+2. Run `npm run dev`.
+3. Open <http://localhost:5173>.
+4. Use the shell controls to start session, join arena, sync viewport, and place a tile.
+5. Open a second tab to confirm realtime tile updates.
+
+> [!IMPORTANT]
+> Development auth mode must remain `off` outside local development.
+
+### Manual Browser Validation Checklist
+
+Use this checklist before marking browser-host work complete:
+
+1. Run `npm run dev`.
+2. Open localhost in a browser and confirm the world view renders.
+3. Place a tile in tab 1.
+4. Open a second tab and confirm the realtime update appears.
 
 ## Database Migrations
 

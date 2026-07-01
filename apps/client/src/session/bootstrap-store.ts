@@ -1,4 +1,7 @@
-import { ExternalIdSessionStateMachine } from "../auth/external-id-session.js";
+import {
+  type AcquireTokenResult,
+  ExternalIdSessionStateMachine
+} from "../auth/external-id-session.js";
 
 export type BootstrapPayload = {
   subject: string;
@@ -22,6 +25,22 @@ export type ReconnectContext = {
   checkpointVersion: number;
   savedAtMs: number;
 };
+
+export type BootstrapErrorClass = "interaction-required" | "denied" | "unavailable";
+
+export type BootstrapDenialCode = "auth-invalid" | "access-denied" | "not-available";
+
+export class BootstrapStoreError extends Error {
+  constructor(
+    readonly errorClass: BootstrapErrorClass,
+    message: string,
+    readonly statusCode?: number,
+    readonly denialCode?: BootstrapDenialCode
+  ) {
+    super(message);
+    this.name = "BootstrapStoreError";
+  }
+}
 
 export class SessionBootstrapStore {
   private reconnectContext: ReconnectContext | null = null;
@@ -48,14 +67,21 @@ export class SessionBootstrapStore {
 
   async bootstrap(): Promise<BootstrapPayload> {
     const tokenState = await this.authSession.acquireTokenReadyState();
+    return await this.bootstrapWithTokenReadyState(tokenState);
+  }
+
+  async bootstrapWithTokenReadyState(tokenState: AcquireTokenResult): Promise<BootstrapPayload> {
 
     if (tokenState.state === "interaction-required") {
       await this.authSession.beginInteractiveAuth();
-      throw new Error("Interactive authentication required");
+      throw new BootstrapStoreError("interaction-required", "Interactive authentication required");
     }
 
     if (tokenState.state !== "token-ready" || !tokenState.accessToken) {
-      throw new Error(`Token acquisition failed: ${tokenState.reasonClass ?? "unknown"}`);
+      throw new BootstrapStoreError(
+        "unavailable",
+        `Token acquisition failed: ${tokenState.reasonClass ?? "unknown"}`
+      );
     }
 
     const response = await fetch(this.bootstrapEndpoint, {
@@ -69,7 +95,10 @@ export class SessionBootstrapStore {
       const retryTokenState = await this.authSession.handleBootstrapUnauthorizedReacquire();
       if (retryTokenState.state !== "token-ready" || !retryTokenState.accessToken) {
         await this.authSession.beginInteractiveAuth();
-        throw new Error("Interactive authentication required after bootstrap unauthorized");
+        throw new BootstrapStoreError(
+          "interaction-required",
+          "Interactive authentication required after bootstrap unauthorized"
+        );
       }
 
       const retryResponse = await fetch(this.bootstrapEndpoint, {
@@ -80,16 +109,48 @@ export class SessionBootstrapStore {
       });
 
       if (!retryResponse.ok) {
-        throw new Error(`Session bootstrap failed after retry with status ${retryResponse.status}`);
+        throw createBootstrapResponseError(retryResponse.status, true);
       }
 
       return (await retryResponse.json()) as BootstrapPayload;
     }
 
     if (!response.ok) {
-      throw new Error(`Session bootstrap failed with status ${response.status}`);
+      throw createBootstrapResponseError(response.status, false);
     }
 
     return (await response.json()) as BootstrapPayload;
   }
+}
+
+function createBootstrapResponseError(statusCode: number, afterRetry: boolean): BootstrapStoreError {
+  if (statusCode === 401 || statusCode === 403) {
+    return new BootstrapStoreError(
+      "denied",
+      afterRetry
+        ? `Session bootstrap denied after retry with status ${statusCode}`
+        : `Session bootstrap denied with status ${statusCode}`,
+      statusCode,
+      statusCode === 401 ? "auth-invalid" : "access-denied"
+    );
+  }
+
+  if (statusCode === 404 || statusCode === 410) {
+    return new BootstrapStoreError(
+      "denied",
+      afterRetry
+        ? `Session bootstrap denied after retry with status ${statusCode}`
+        : `Session bootstrap denied with status ${statusCode}`,
+      statusCode,
+      "not-available"
+    );
+  }
+
+  return new BootstrapStoreError(
+    "unavailable",
+    afterRetry
+      ? `Session bootstrap unavailable after retry with status ${statusCode}`
+      : `Session bootstrap unavailable with status ${statusCode}`,
+    statusCode
+  );
 }

@@ -6,6 +6,7 @@ import { createSessionRoutes } from "./routes/session.routes.js";
 import { createTileRoutes } from "./routes/tile.routes.js";
 import { createSnapshotRoutes } from "./routes/snapshot.routes.js";
 import { createRegionDiffRoutes } from "./routes/region-diff.routes.js";
+import { createDevAuthRoutes } from "./routes/dev-auth.routes.js";
 import { TelemetrySink } from "../telemetry/telemetry-sink.js";
 import { AuthService } from "../auth/auth-service.js";
 import { SessionLifecycleService } from "../session/session-lifecycle.service.js";
@@ -39,6 +40,7 @@ export function getDeltaFanoutRegistryKey(regionId: string): string {
 export type HttpAppDependencies = {
   readinessCheck: () => Promise<ReadinessReport>;
   authMiddleware: RequestHandler;
+  enableDevAuthRoutes?: boolean;
   telemetrySink: TelemetrySink;
   authService: AuthService;
   lifecycleService: SessionLifecycleService;
@@ -71,6 +73,26 @@ export function createHttpApp(dependencies: HttpAppDependencies) {
   const app = express();
   const appWithCleanup = app as typeof app & { _throttleCleanupInterval?: ReturnType<typeof setInterval> };
   app.disable("x-powered-by");
+
+  app.use((req, res, next) => {
+    const origin = req.headers.origin;
+    const isLocalhostOrigin = typeof origin === "string" && /^http:\/\/localhost:\d+$/.test(origin);
+
+    if (isLocalhostOrigin) {
+      res.header("Access-Control-Allow-Origin", origin);
+      res.header("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
+      res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+      res.header("Access-Control-Max-Age", "600");
+      res.header("Vary", "Origin");
+    }
+
+    if (req.method === "OPTIONS") {
+      res.status(204).end();
+      return;
+    }
+
+    next();
+  });
 
   const tilePlaceThrottlePolicy = dependencies.tilePlaceThrottlePolicy ?? {
     maxRequests: 5,
@@ -133,6 +155,12 @@ export function createHttpApp(dependencies: HttpAppDependencies) {
   appWithCleanup._throttleCleanupInterval = cleanupInterval;
 
   app.use(express.json());
+  app.use(
+    createDevAuthRoutes({
+      authService: dependencies.authService,
+      enabled: dependencies.enableDevAuthRoutes ?? false
+    })
+  );
   app.use(createHealthRoutes(dependencies.readinessCheck));
   app.use(dependencies.authMiddleware);
   app.use(createProtectedRoutes());

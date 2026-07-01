@@ -17,6 +17,9 @@
       "path": "apps/client"
     },
     {
+      "path": "apps/web"
+    },
+    {
       "path": "apps/server"
     }
   ]

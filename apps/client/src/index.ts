@@ -5,7 +5,44 @@ export type { ExternalIdClientConfig } from "./auth/msal-config.js";
 export { getJoinToken } from "./auth/join-token-caller.js";
 export type { JoinTokenResponse } from "./auth/join-token-caller.js";
 export { SessionBootstrapStore } from "./session/bootstrap-store.js";
-export type { BootstrapPayload, ReconnectContext } from "./session/bootstrap-store.js";
+export {
+	BootstrapStoreError
+} from "./session/bootstrap-store.js";
+export type {
+	BootstrapPayload,
+	ReconnectContext,
+	BootstrapErrorClass,
+	BootstrapDenialCode
+} from "./session/bootstrap-store.js";
+export {
+	ShellStartupOrchestrator,
+	startShellSession
+} from "./shell/shell-startup.js";
+export type { ShellStartupDependencies } from "./shell/shell-startup.js";
+export {
+	createInitialShellStartupRuntime,
+	transitionShellStartupRuntime
+} from "./shell/shell-startup-state.js";
+export type {
+	ShellStartupState,
+	ShellStartupTransitionEvent,
+	ShellBootstrapDenialCode,
+	ShellStartupFailureClass,
+	ShellStartupRuntime,
+	ShellStartupResult,
+	ShellStartupSucceededResult,
+	ShellStartupFailedResult
+} from "./shell/shell-startup-state.js";
+export { ShellTelemetryAdapter } from "./shell/shell-telemetry.js";
+export type {
+	ShellTelemetryEventName,
+	ShellTelemetryPayload,
+	ShellTelemetryEvent,
+	ShellTelemetrySink,
+	ShellTelemetryOptions,
+	ShellStartupSuccessTelemetryInput,
+	ShellStartupFailureTelemetryInput
+} from "./shell/shell-telemetry.js";
 export { sendHeartbeat } from "./session/heartbeat-caller.js";
 export type { HeartbeatResponse } from "./session/heartbeat-caller.js";
 export {

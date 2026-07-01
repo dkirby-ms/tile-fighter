@@ -20,6 +20,8 @@ const envSchema = z.object({
   ALLOWED_TENANT_IDS: z.string().optional(),
   DENIED_TENANT_IDS: z.string().optional(),
   ALLOWED_ISSUERS: z.string().optional(),
+  DEV_AUTH_MODE: z.enum(["off", "allow"]).default("off"),
+  DEV_AUTH_SHARED_SECRET: z.string().optional(),
   TELEMETRY_SINK_MODE: z.enum(["off", "optional", "required"]).default("optional"),
   TELEMETRY_SINK_URL: z.preprocess((value) => (value === "" ? undefined : value), z.string().url().optional()),
   TELEMETRY_SINK_NAME: z.string().optional(),
@@ -57,6 +59,8 @@ export type RuntimeConfig = {
   allowedTenantIds: string[];
   deniedTenantIds: string[];
   allowedIssuers: string[];
+  devAuthMode: "off" | "allow";
+  devAuthSharedSecret?: string;
   telemetrySinkMode: "off" | "optional" | "required";
   telemetrySinkUrl?: string;
   telemetrySinkName?: string;
@@ -99,6 +103,10 @@ export function readRuntimeConfig(): RuntimeConfig {
     throw new Error("TELEMETRY_SINK_URL is required when TELEMETRY_SINK_MODE is required");
   }
 
+  if (parsed.DEV_AUTH_MODE === "allow" && !parsed.DEV_AUTH_SHARED_SECRET) {
+    throw new Error("DEV_AUTH_SHARED_SECRET is required when DEV_AUTH_MODE is allow");
+  }
+
   return {
     nodeEnv: parsed.NODE_ENV,
     port: parsed.PORT,
@@ -112,6 +120,8 @@ export function readRuntimeConfig(): RuntimeConfig {
     allowedTenantIds: splitCsv(parsed.ALLOWED_TENANT_IDS),
     deniedTenantIds: splitCsv(parsed.DENIED_TENANT_IDS),
     allowedIssuers: splitCsv(parsed.ALLOWED_ISSUERS),
+    devAuthMode: parsed.DEV_AUTH_MODE,
+    ...(parsed.DEV_AUTH_SHARED_SECRET ? { devAuthSharedSecret: parsed.DEV_AUTH_SHARED_SECRET } : {}),
     telemetrySinkMode: parsed.TELEMETRY_SINK_MODE,
     ...(parsed.TELEMETRY_SINK_URL ? { telemetrySinkUrl: parsed.TELEMETRY_SINK_URL } : {}),
     ...(parsed.TELEMETRY_SINK_NAME ? { telemetrySinkName: parsed.TELEMETRY_SINK_NAME } : {}),

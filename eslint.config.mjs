@@ -26,5 +26,13 @@ export default [
     rules: {
       ...tsPlugin.configs.recommended.rules
     }
+  },
+  {
+    files: ["apps/web/src/**/*.ts"],
+    languageOptions: {
+      globals: {
+        ...globals.browser
+      }
+    }
   }
 ];
