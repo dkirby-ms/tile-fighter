@@ -233,6 +233,100 @@ export class TileRepository implements ITileRepository {
     return handler(db as unknown as Transaction<ServerDatabase>);
   }
 
+  private async resolveCoordinateConflict(
+    db: Kysely<ServerDatabase>,
+    args: {
+      input: InsertTileInput;
+      commandId: string;
+      requestHash: string;
+      now: Date;
+    }
+  ): Promise<InsertTileResult> {
+    const winnerTile = await this.withTransaction(db, async (trx) => {
+      return trx
+        .selectFrom("tiles")
+        .select(["id", "owner_id", "created_at"])
+        .where("region_id", "=", args.input.regionId)
+        .where("cell_x", "=", args.input.cellX)
+        .where("cell_y", "=", args.input.cellY)
+        .executeTakeFirst();
+    });
+
+    const winnerOwnerId = winnerTile?.owner_id ?? "unknown";
+    const winnerTileId = winnerTile?.id ?? 0;
+    const winnerResolvedAt = winnerTile?.created_at ?? args.now;
+
+    await this.telemetrySink?.emitPlacementConflictDetected({
+      regionId: args.input.regionId,
+      commandId: args.commandId,
+      actorId: args.input.ownerId,
+      cellX: args.input.cellX,
+      cellY: args.input.cellY,
+      winnerOwnerId,
+      winnerTileId
+    });
+
+    const snapshot: PlacementOccupiedSnapshot = {
+      ok: false,
+      reason: "occupied",
+      commandId: args.commandId,
+      regionId: args.input.regionId,
+      cell: {
+        cellX: args.input.cellX,
+        cellY: args.input.cellY
+      },
+      winner: {
+        ownerId: winnerOwnerId,
+        tileId: winnerTileId,
+        resolvedAt: winnerResolvedAt.toISOString()
+      }
+    };
+
+    await this.withTransaction(db, async (trx) => {
+      await this.updateLedgerOutcome(trx, {
+        input: args.input,
+        commandId: args.commandId,
+        requestHash: args.requestHash,
+        now: args.now,
+        outcome: "occupied",
+        responseSnapshot: snapshot,
+        winnerOwnerId,
+        winnerTileId,
+        winnerResolvedAt
+      });
+    });
+
+    await this.telemetrySink?.emitPlacementConflictResolved({
+      regionId: args.input.regionId,
+      commandId: args.commandId,
+      actorId: args.input.ownerId,
+      cellX: args.input.cellX,
+      cellY: args.input.cellY,
+      outcome: "occupied",
+      replayed: false,
+      winnerOwnerId,
+      winnerTileId,
+      winnerResolvedAt: winnerResolvedAt.toISOString()
+    });
+
+    return {
+      ok: false,
+      reason: "coordinate_conflict",
+      replayed: false,
+      commandId: args.commandId,
+      regionId: args.input.regionId,
+      error: {
+        type: "coordinate_conflict",
+        region_id: args.input.regionId,
+        cell_x: args.input.cellX,
+        cell_y: args.input.cellY,
+        winner_owner_id: winnerOwnerId,
+        winner_tile_id: winnerTileId,
+        winner_resolved_at: winnerResolvedAt
+      }
+    };
+  }
+
   /**
    * Insert a tile with deterministic conflict error handling
    * Maps SQLSTATE 23505 (unique violation) to coordinate_conflict result
@@ -372,85 +466,12 @@ export class TileRepository implements ITileRepository {
         };
       } catch (error) {
         if (this.isCoordinateConflict(error)) {
-          const winnerTile = await trx
-            .selectFrom("tiles")
-            .select(["id", "owner_id", "created_at"])
-            .where("region_id", "=", input.regionId)
-            .where("cell_x", "=", input.cellX)
-            .where("cell_y", "=", input.cellY)
-            .executeTakeFirst();
-
-          const winnerOwnerId = winnerTile?.owner_id ?? "unknown";
-          const winnerTileId = winnerTile?.id ?? 0;
-          const winnerResolvedAt = winnerTile?.created_at ?? now;
-
-          await this.telemetrySink?.emitPlacementConflictDetected({
-            regionId: input.regionId,
-            commandId,
-            actorId: input.ownerId,
-            cellX: input.cellX,
-            cellY: input.cellY,
-            winnerOwnerId,
-            winnerTileId
-          });
-
-          const snapshot: PlacementOccupiedSnapshot = {
-            ok: false,
-            reason: "occupied",
-            commandId,
-            regionId: input.regionId,
-            cell: {
-              cellX: input.cellX,
-              cellY: input.cellY
-            },
-            winner: {
-              ownerId: winnerOwnerId,
-              tileId: winnerTileId,
-              resolvedAt: winnerResolvedAt.toISOString()
-            }
-          };
-
-          await this.updateLedgerOutcome(trx, {
+          return this.resolveCoordinateConflict(db, {
             input,
             commandId,
             requestHash,
-            now,
-            outcome: "occupied",
-            responseSnapshot: snapshot,
-            winnerOwnerId,
-            winnerTileId,
-            winnerResolvedAt
+            now
           });
-
-          await this.telemetrySink?.emitPlacementConflictResolved({
-            regionId: input.regionId,
-            commandId,
-            actorId: input.ownerId,
-            cellX: input.cellX,
-            cellY: input.cellY,
-            outcome: "occupied",
-            replayed: false,
-            winnerOwnerId,
-            winnerTileId,
-            winnerResolvedAt: winnerResolvedAt.toISOString()
-          });
-
-          return {
-            ok: false,
-            reason: "coordinate_conflict",
-            replayed: false,
-            commandId,
-            regionId: input.regionId,
-            error: {
-              type: "coordinate_conflict",
-              region_id: input.regionId,
-              cell_x: input.cellX,
-              cell_y: input.cellY,
-              winner_owner_id: winnerOwnerId,
-              winner_tile_id: winnerTileId,
-              winner_resolved_at: winnerResolvedAt
-            }
-          };
         }
 
         throw error;
@@ -655,15 +676,27 @@ export class TileRepository implements ITileRepository {
   }
 
   private isCoordinateConflict(error: unknown): boolean {
-    if (!(error instanceof Error) || !error.message || !error.message.includes("23505")) {
+    const postgresError = error as {
+      code?: string;
+      constraint?: string;
+      detail?: string;
+      message?: string;
+    } | null;
+
+    const message = postgresError?.message ?? (error instanceof Error ? error.message : "");
+    const detail = postgresError?.detail ?? "";
+
+    if (postgresError?.code !== "23505" && !message.includes("23505")) {
       return false;
     }
 
     return (
-      error.message.includes("tiles_region_coordinate_unique") ||
-      error.message.includes("region_id") ||
-      error.message.includes("cell_x") ||
-      error.message.includes("cell_y")
+      postgresError?.constraint === "tiles_region_coordinate_unique" ||
+      message.includes("tiles_region_coordinate_unique") ||
+      detail.includes("(region_id, cell_x, cell_y)") ||
+      message.includes("region_id") ||
+      message.includes("cell_x") ||
+      message.includes("cell_y")
     );
   }
 

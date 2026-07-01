@@ -1,5 +1,6 @@
 import http from "node:http";
 import { Server } from "@colyseus/core";
+import { monitor } from "@colyseus/monitor";
 import { WebSocketTransport } from "@colyseus/ws-transport";
 import { ReadinessReport } from "@game/shared-types";
 import { AuthService } from "./auth/auth-service.js";
@@ -107,6 +108,7 @@ async function bootstrap(): Promise<void> {
     authMiddleware: buildAuthMiddleware(authService, undefined, {
       devAuthMode: runtimeConfig.devAuthMode
     }),
+    monitorRouter: monitor(),
     telemetrySink,
     authService,
     lifecycleService,

@@ -41,10 +41,14 @@ export type ApplyDeltaCallback = (delta: RealtimeDeltaPayload) => void | Promise
  */
 export class RealtimeDeltaHandler {
   private lastAppliedSequenceId: string | null = null;
-  private messageUnsubscriber?: () => void;
+  private unsubscribe: (() => void) | undefined;
 
   constructor(
-    private readonly room: { on(event: string, handler: (data: unknown) => void): void; send(event: string, data: unknown): void },
+    private readonly room: {
+      onMessage?: (event: string, handler: (data: unknown) => void) => void;
+      on?: (event: string, handler: (data: unknown) => void) => void;
+      send(event: string, data: unknown): void;
+    },
     private readonly applyDeltaCallback: ApplyDeltaCallback
   ) {}
 
@@ -53,17 +57,32 @@ export class RealtimeDeltaHandler {
    * Sets up message handler for ordered apply with monotonic sequence tracking
    */
   start(): void {
-    this.room.on("delta", ((payload: RealtimeDeltaPayload) => {
+    const handler = ((payload: RealtimeDeltaPayload) => {
       this.handleDelta(payload);
-    }) as (data: unknown) => void);
+    }) as (data: unknown) => void;
+
+    if (typeof this.room.onMessage === "function") {
+      this.room.onMessage("delta", handler);
+      return;
+    }
+
+    if (typeof this.room.on === "function") {
+      this.room.on("delta", handler);
+      this.unsubscribe = () => {
+        this.unsubscribe = undefined;
+      };
+      return;
+    }
+
+    throw new Error("Room does not support delta message subscriptions");
   }
 
   /**
    * Stop listening for delta messages
    */
   stop(): void {
-    if (this.messageUnsubscriber) {
-      this.messageUnsubscriber();
+    if (this.unsubscribe) {
+      this.unsubscribe();
     }
   }
 
@@ -136,7 +155,11 @@ export class RealtimeDeltaHandler {
  * Simplified interface for integration with session lifecycle
  */
 export function createRealtimeDeltaHandler(
-  room: { on(event: string, handler: (data: unknown) => void): void; send(event: string, data: unknown): void },
+  room: {
+    onMessage?: (event: string, handler: (data: unknown) => void) => void;
+    on?: (event: string, handler: (data: unknown) => void) => void;
+    send(event: string, data: unknown): void;
+  },
   applyDeltaCallback: ApplyDeltaCallback
 ): RealtimeDeltaHandler {
   const handler = new RealtimeDeltaHandler(room, applyDeltaCallback);

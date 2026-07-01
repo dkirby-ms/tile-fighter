@@ -1,4 +1,5 @@
 import express, { RequestHandler } from "express";
+import { Router } from "express";
 import { ReadinessReport } from "@game/shared-types";
 import { createHealthRoutes } from "./routes/health.routes.js";
 import { createProtectedRoutes } from "./routes/protected.routes.js";
@@ -39,6 +40,7 @@ export function getDeltaFanoutRegistryKey(regionId: string): string {
 export type HttpAppDependencies = {
   readinessCheck: () => Promise<ReadinessReport>;
   authMiddleware: RequestHandler;
+  monitorRouter?: Router;
   telemetrySink: TelemetrySink;
   authService: AuthService;
   lifecycleService: SessionLifecycleService;
@@ -135,6 +137,9 @@ export function createHttpApp(dependencies: HttpAppDependencies) {
 
   app.use(express.json());
   app.use(createHealthRoutes(dependencies.readinessCheck));
+  if (dependencies.monitorRouter) {
+    app.use("/monitor", dependencies.monitorRouter);
+  }
   app.use(dependencies.authMiddleware);
   app.use(createProtectedRoutes());
   if (dependencies.regionSnapshotService) {
