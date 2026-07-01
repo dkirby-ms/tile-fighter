@@ -15,10 +15,22 @@ import { fetchSessionBootstrap, placeTile, probeApi } from "./api.js";
 import { getBrowserRuntimeEnv } from "./env.js";
 import { bindBrowserRenderHandlers, renderBrowserAppState } from "./render.js";
 import { connectRoom, joinArenaRoom } from "./room.js";
+import { emitClientTelemetry } from "./telemetry.js";
 import {
+  addOptimisticTile,
   applyRealtimeDelta,
+  clearOptimisticTile,
   createInitialBrowserAppState,
+  isCellOccupied,
+  recomputeBonds,
+  selectColor,
   selectCell,
+  setAccessibility,
+  setOnboardingState,
+  selectShape,
+  setPaletteOpen,
+  setPreview,
+  updateViewport,
   withAppState,
   type BrowserAppState
 } from "./state.js";
@@ -40,18 +52,184 @@ export async function startBrowserApp(): Promise<void> {
     status: "auth-preflight",
     message: "Checking auth configuration before startup."
   });
+  void emitClientTelemetry("tutorial_started", {
+    room_id: currentState.roomId,
+    started_at_ms: currentState.onboarding.startedAtMs
+  });
 
   const render = () => {
-    renderBrowserAppState(currentState);
+    const renderOutcome = renderBrowserAppState(currentState);
     bindBrowserRenderHandlers({
       onSelectCell: (cellX, cellY) => {
         currentState = selectCell(currentState, cellX, cellY);
         render();
       },
+      onTogglePalette: () => {
+        const nextPaletteState = !currentState.paletteOpen;
+        currentState = setPaletteOpen(currentState, nextPaletteState);
+        if (nextPaletteState) {
+          void emitClientTelemetry("palette_opened", {
+            room_id: currentState.roomId,
+            selected_shape: currentState.palette.shape,
+            selected_color: currentState.palette.color
+          });
+        }
+        render();
+      },
+      onNextOnboardingStep: () => {
+        if (currentState.onboarding.completed) {
+          return;
+        }
+
+        const nextStep = Math.min(3, currentState.onboarding.activeStep + 1) as 1 | 2 | 3;
+        currentState = setOnboardingState(currentState, {
+          activeStep: nextStep
+        });
+        render();
+      },
+      onSkipOnboarding: () => {
+        if (currentState.onboarding.completed) {
+          return;
+        }
+
+        const completedAtMs = Date.now();
+        currentState = setOnboardingState(currentState, {
+          skipped: true,
+          completed: true,
+          completedAtMs,
+          activeStep: 3
+        });
+        void emitClientTelemetry("tutorial_completed", {
+          room_id: currentState.roomId,
+          skipped: true,
+          elapsed_ms: completedAtMs - currentState.onboarding.startedAtMs
+        });
+        render();
+      },
+      onSelectShape: (shape) => {
+        currentState = selectShape(currentState, shape);
+        void emitClientTelemetry("shape_selected", {
+          room_id: currentState.roomId,
+          shape
+        });
+        render();
+      },
+      onSelectColor: (color) => {
+        currentState = selectColor(currentState, color);
+        void emitClientTelemetry("color_selected", {
+          room_id: currentState.roomId,
+          color
+        });
+        render();
+      },
+      onToggleHighContrast: () => {
+        const enabled = !currentState.accessibility.highContrastEnabled;
+        currentState = setAccessibility(currentState, {
+          highContrastEnabled: enabled
+        });
+        void emitClientTelemetry("a11y_mode_enabled", {
+          room_id: currentState.roomId,
+          mode: "high_contrast",
+          enabled
+        });
+        render();
+      },
+      onToggleReducedMotion: () => {
+        const enabled = !currentState.accessibility.reducedMotionEnabled;
+        currentState = setAccessibility(currentState, {
+          reducedMotionEnabled: enabled
+        });
+        void emitClientTelemetry("reduced_motion_enabled", {
+          room_id: currentState.roomId,
+          enabled
+        });
+        render();
+      },
+      onKeyboardMove: (deltaCellX, deltaCellY) => {
+        currentState = selectCell(
+          currentState,
+          currentState.selectedCellX + deltaCellX,
+          currentState.selectedCellY + deltaCellY
+        );
+        render();
+      },
+      onKeyboardPlace: async () => {
+        void emitClientTelemetry("keyboard_placement_used", {
+          room_id: currentState.roomId,
+          cell_x: currentState.selectedCellX,
+          cell_y: currentState.selectedCellY
+        });
+        await handleTilePlacement();
+      },
+      onHoverCell: (cellX, cellY) => {
+        const blocked = isCellOccupied(currentState, cellX, cellY);
+        currentState = setPreview(currentState, {
+          cellX,
+          cellY,
+          blocked
+        });
+        if (!blocked) {
+          void emitClientTelemetry("placement_preview_shown", {
+            room_id: currentState.roomId,
+            cell_x: cellX,
+            cell_y: cellY,
+            shape: currentState.palette.shape,
+            color: currentState.palette.color
+          });
+        }
+        render();
+      },
+      onClearPreview: () => {
+        currentState = setPreview(currentState, undefined);
+        render();
+      },
+      onPanBy: (deltaCellX, deltaCellY) => {
+        const tileSize = Math.max(20, Math.round(56 * currentState.viewport.zoom));
+        currentState = updateViewport(currentState, {
+          panX: currentState.viewport.panX + deltaCellX * tileSize,
+          panY: currentState.viewport.panY + deltaCellY * tileSize
+        });
+        void emitClientTelemetry("viewport_changed", {
+          room_id: currentState.roomId,
+          pan_x: currentState.viewport.panX,
+          pan_y: currentState.viewport.panY,
+          zoom: currentState.viewport.zoom
+        });
+        render();
+      },
+      onZoomBy: (deltaZoom) => {
+        const nextZoom = clampZoom(currentState.viewport.zoom + deltaZoom);
+        currentState = updateViewport(currentState, { zoom: nextZoom });
+        void emitClientTelemetry("zoom_level_changed", {
+          room_id: currentState.roomId,
+          zoom: nextZoom
+        });
+        render();
+      },
+      onZoomReset: () => {
+        currentState = updateViewport(currentState, { zoom: 1 });
+        void emitClientTelemetry("zoom_level_changed", {
+          room_id: currentState.roomId,
+          zoom: 1
+        });
+        render();
+      },
+      getViewport: () => currentState.viewport,
       onPlaceTile: async () => {
         await handleTilePlacement();
       }
     });
+
+    if (renderOutcome.visibleBondCount > 0) {
+      void emitClientTelemetry("bond_effect_rendered", {
+        room_id: currentState.roomId,
+        visible_bond_count: renderOutcome.visibleBondCount,
+        visible_tile_count: renderOutcome.visibleTileCount,
+        culled_tile_count: renderOutcome.culledTileCount,
+        zoom: currentState.viewport.zoom,
+        reduced_motion: currentState.accessibility.reducedMotionEnabled
+      });
+    }
   };
 
   render();
@@ -179,21 +357,43 @@ export async function startBrowserApp(): Promise<void> {
       return;
     }
 
+    const targetCellX = currentState.selectedCellX;
+    const targetCellY = currentState.selectedCellY;
+    if (isCellOccupied(currentState, targetCellX, targetCellY)) {
+      currentState = withAppState(currentState, {
+        placeFeedback: `Cell (${targetCellX},${targetCellY}) is occupied.`
+      });
+      render();
+      return;
+    }
+
     const commandId = createCommandId();
     const checksumSeed = [
       {
         regionId: env.roomId,
-        cellX: currentState.selectedCellX,
-        cellY: currentState.selectedCellY,
+        cellX: targetCellX,
+        cellY: targetCellY,
         offsetX: 0,
         offsetY: 0,
-        shape: "square",
-        color: "orange",
+        shape: currentState.palette.shape,
+        color: currentState.palette.color,
         stylePayload: { source: "browser-loop" },
         ownerId: "self"
       }
     ];
     const commandChecksum = await createBrowserChecksum(checksumSeed);
+
+    currentState = addOptimisticTile(currentState, {
+      cellX: targetCellX,
+      cellY: targetCellY,
+      shape: currentState.palette.shape,
+      color: currentState.palette.color
+    });
+    currentState = recomputeBonds(currentState);
+    currentState = withAppState(currentState, {
+      placeFeedback: `Placing ${currentState.palette.shape} tile at (${targetCellX},${targetCellY})...`
+    });
+    render();
 
     const response = await placeTile(
       env,
@@ -203,12 +403,12 @@ export async function startBrowserApp(): Promise<void> {
       {
         commandId,
         regionId: env.roomId,
-        cellX: currentState.selectedCellX,
-        cellY: currentState.selectedCellY,
+        cellX: targetCellX,
+        cellY: targetCellY,
         offsetX: 0,
         offsetY: 0,
-        shape: "square",
-        color: "orange",
+        shape: currentState.palette.shape,
+        color: currentState.palette.color,
         stylePayload: {
           source: "browser-loop",
           checksum: commandChecksum
@@ -217,6 +417,31 @@ export async function startBrowserApp(): Promise<void> {
     );
 
     if (response.result.ok) {
+      const placementCompletedAtMs = Date.now();
+      if (!currentState.firstTilePlacedAtMs) {
+        currentState = withAppState(currentState, {
+          firstTilePlacedAtMs: placementCompletedAtMs
+        });
+        void emitClientTelemetry("first_tile_time_recorded", {
+          room_id: currentState.roomId,
+          elapsed_ms: placementCompletedAtMs - currentState.onboarding.startedAtMs
+        });
+      }
+
+      if (!currentState.onboarding.completed) {
+        currentState = setOnboardingState(currentState, {
+          completed: true,
+          skipped: false,
+          completedAtMs: placementCompletedAtMs,
+          activeStep: 3
+        });
+        void emitClientTelemetry("tutorial_completed", {
+          room_id: currentState.roomId,
+          skipped: false,
+          elapsed_ms: placementCompletedAtMs - currentState.onboarding.startedAtMs
+        });
+      }
+
       currentState = withAppState(currentState, {
         placeFeedback: `Placed tile ${response.result.tileId} (status ${response.status}).`
       });
@@ -225,6 +450,8 @@ export async function startBrowserApp(): Promise<void> {
     }
 
     if (response.result.reason === "occupied") {
+      currentState = clearOptimisticTile(currentState, targetCellX, targetCellY);
+      currentState = recomputeBonds(currentState);
       currentState = withAppState(currentState, {
         placeFeedback: `Conflict at (${response.result.cell.cellX},${response.result.cell.cellY}); winner ${response.result.winner.ownerId}.`
       });
@@ -233,6 +460,8 @@ export async function startBrowserApp(): Promise<void> {
     }
 
     if (response.result.reason === "throttled") {
+      currentState = clearOptimisticTile(currentState, targetCellX, targetCellY);
+      currentState = recomputeBonds(currentState);
       currentState = withAppState(currentState, {
         placeFeedback: `Rate limited. Retry after ${response.result.retryAfterMs}ms.`
       });
@@ -240,11 +469,17 @@ export async function startBrowserApp(): Promise<void> {
       return;
     }
 
+    currentState = clearOptimisticTile(currentState, targetCellX, targetCellY);
+    currentState = recomputeBonds(currentState);
     currentState = withAppState(currentState, {
       placeFeedback: `Placement rejected: ${response.result.reason}.`
     });
     render();
   }
+}
+
+function clampZoom(value: number): number {
+  return Math.min(2, Math.max(0.5, Number(value.toFixed(2))));
 }
 
 function buildClientConfigFromEnv(env: ReturnType<typeof getBrowserRuntimeEnv>):

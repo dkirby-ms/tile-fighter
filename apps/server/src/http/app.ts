@@ -18,6 +18,7 @@ import { DEFAULT_REGION_DIFF_POLICY } from "@game/shared-types";
 import { SessionCheckpointService } from "../session/session-checkpoint.service.js";
 import { DeltaFanoutCoordinator, type DeltaFanoutConfig } from "../domain/delta-fanout.service.js";
 import type { RealtimeDeltaPayload } from "../domain/delta-fanout.service.js";
+import { BondEvaluatorService } from "../domain/bond-evaluator.service.js";
 
 /**
  * Registry for room-scoped delta fanout coordinators indexed by regionId
@@ -48,6 +49,7 @@ export type HttpAppDependencies = {
   regionDiffService?: RegionDiffService;
   deltaFanoutRegistry?: DeltaFanoutRegistry;
   deltaFanoutConfig?: DeltaFanoutConfig;
+  bondEvaluatorService?: BondEvaluatorService;
   tilePlaceThrottlePolicy?: {
     maxRequests: number;
     windowMs: number;
@@ -211,6 +213,64 @@ export function createHttpApp(dependencies: HttpAppDependencies) {
             input.cellY,
             input.ownerId
           );
+
+          if (dependencies.bondEvaluatorService) {
+            const allTiles = await dependencies.tileRepository!.selectTilesByRegion(
+              dependencies.db!,
+              input.regionId
+            );
+
+            const recompute = dependencies.bondEvaluatorService.recomputeNeighborhood({
+              regionId: input.regionId,
+              originCellX: input.cellX,
+              originCellY: input.cellY,
+              tiles: allTiles.map((tile) => ({
+                regionId: tile.region_id,
+                cellX: tile.cell_x,
+                cellY: tile.cell_y,
+                color: tile.color
+              }))
+            });
+
+            await dependencies.telemetrySink.emitBondRecalcStarted({
+              regionId: input.regionId,
+              originCellX: input.cellX,
+              originCellY: input.cellY,
+              touchedCellCount: recompute.touchedCellCount
+            });
+
+            if (recompute.skippedCellCount > 0) {
+              await dependencies.telemetrySink.emitBondRecalcSkipped({
+                regionId: input.regionId,
+                originCellX: input.cellX,
+                originCellY: input.cellY,
+                skippedCellCount: recompute.skippedCellCount
+              });
+            }
+
+            await dependencies.telemetrySink.emitBondRecalcCompleted({
+              regionId: input.regionId,
+              originCellX: input.cellX,
+              originCellY: input.cellY,
+              touchedCellCount: recompute.touchedCellCount,
+              recalculatedCellCount: recompute.recalculatedCellCount,
+              skippedCellCount: recompute.skippedCellCount,
+              bondCount: recompute.bondCount
+            });
+
+            for (const bond of recompute.bonds) {
+              await dependencies.telemetrySink.emitBondingTriggered({
+                regionId: bond.regionId,
+                bondId: bond.bondId,
+                bondType: bond.bondType,
+                fromCellX: bond.fromCellX,
+                fromCellY: bond.fromCellY,
+                toCellX: bond.toCellX,
+                toCellY: bond.toCellY,
+                color: bond.color
+              });
+            }
+          }
 
           // Dispatch fanout to subscribers in this region after successful commit
           if (dependencies.deltaFanoutRegistry && result.tile.sequenceId) {

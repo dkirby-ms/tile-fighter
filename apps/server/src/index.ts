@@ -20,6 +20,7 @@ import { TelemetrySink } from "./telemetry/telemetry-sink.js";
 import { SessionLifecycleService } from "./session/session-lifecycle.service.js";
 import { createRegionSnapshotService } from "./domain/region-snapshot.service.js";
 import { createRegionDiffService } from "./domain/region-diff.service.js";
+import { createBondEvaluatorService } from "./domain/bond-evaluator.service.js";
 import { createSessionCheckpointRepository } from "./persistence/session-checkpoint.repository.js";
 import { SessionCheckpointService } from "./session/session-checkpoint.service.js";
 import { ReconnectTokenService } from "./auth/reconnect-token.service.js";
@@ -48,6 +49,7 @@ async function bootstrap(): Promise<void> {
     repository: regionDiffRepository,
     telemetrySink
   });
+  const bondEvaluatorService = createBondEvaluatorService();
   const sessionCheckpointRepository = createSessionCheckpointRepository();
   const reconnectTokenService = new ReconnectTokenService({
     signingSecret: runtimeConfig.joinTokenSigningSecret,
@@ -113,6 +115,7 @@ async function bootstrap(): Promise<void> {
     tileRepository,
     regionSnapshotService,
     regionDiffService,
+    bondEvaluatorService,
     deltaFanoutRegistry,
     deltaFanoutConfig,
     tilePlaceThrottlePolicy: {

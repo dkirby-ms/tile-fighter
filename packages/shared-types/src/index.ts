@@ -125,6 +125,33 @@ export interface TileEditCommand {
   stylePayload: unknown;
 }
 
+export type BondType = "glow_chain" | "blend_gradient" | "pulse_rhythm";
+
+export interface BondIdentifier {
+  regionId: string;
+  fromCellX: number;
+  fromCellY: number;
+  toCellX: number;
+  toCellY: number;
+}
+
+export interface BondOutcome extends BondIdentifier {
+  bondId: string;
+  bondType: BondType;
+  color: string;
+}
+
+export interface BondNeighborhoodRecomputeResult {
+  regionId: string;
+  originCellX: number;
+  originCellY: number;
+  touchedCellCount: number;
+  recalculatedCellCount: number;
+  skippedCellCount: number;
+  bondCount: number;
+  bonds: BondOutcome[];
+}
+
 /**
  * Discriminated union result for tile edit operations.
  *
@@ -220,4 +247,32 @@ export interface RegionDiffResponse {
     returnedTileCount: number;
     policy: RegionDiffPolicyMetadata;
   };
+}
+
+export type ClientInteractionTelemetryEventName =
+  | "palette_opened"
+  | "shape_selected"
+  | "color_selected"
+  | "placement_preview_shown"
+  | "viewport_changed"
+  | "zoom_level_changed"
+  | "bond_effect_rendered"
+  | "tutorial_started"
+  | "tutorial_completed"
+  | "first_tile_time_recorded"
+  | "a11y_mode_enabled"
+  | "keyboard_placement_used"
+  | "reduced_motion_enabled";
+
+export interface ClientViewportState {
+  panX: number;
+  panY: number;
+  zoom: number;
+  canvasWidth: number;
+  canvasHeight: number;
+}
+
+export interface ClientPaletteSelection {
+  shape: string;
+  color: string;
 }

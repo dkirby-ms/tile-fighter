@@ -103,3 +103,32 @@ These defaults remain active until decision register items PD-01 through PD-06 a
 * Integration tests require an explicit database URL from `TEST_DATABASE_URL` (preferred) or `DATABASE_URL`.
 * If both `TEST_DATABASE_URL` and `DATABASE_URL` are set, they must match exactly.
 * CI and local runs use the same guard behavior and fail fast on missing or conflicting values.
+
+## E4 and E5 UAT Telemetry Contract
+
+Manual UAT for Epic 4 and Epic 5 depends on stable telemetry event families emitted from authoritative server placement flow and client interaction flow.
+
+Server-authoritative events (emitted by placement and recompute execution):
+
+* `bond_recalc_started`
+* `bond_recalc_completed`
+* `bond_recalc_skipped`
+* `bonding_triggered`
+
+Client-interaction events (emitted from browser UI/render flow):
+
+* `palette_opened`
+* `shape_selected`
+* `color_selected`
+* `placement_preview_shown`
+* `viewport_changed`
+* `zoom_level_changed`
+* `bond_effect_rendered`
+* `tutorial_started`
+* `tutorial_completed`
+* `first_tile_time_recorded`
+* `a11y_mode_enabled`
+* `keyboard_placement_used`
+* `reduced_motion_enabled`
+
+The default UAT observation path is the configured telemetry sink URL (`TELEMETRY_SINK_URL` on server and `VITE_APP_TELEMETRY_SINK_URL` on client). For manual execution, keep browser network inspection open and filter requests to the sink endpoint.

@@ -7,11 +7,21 @@ Gaps and differences identified between research findings and the implementation
 
 ### Unaddressed Research Items
 
-None currently.
+* DR-01: Manual row-6 contrast and reduced-motion visual verification is not executable in headless/unit validation.
+  * Source: `.copilot-tracking/research/2026-07-01/e4-e5-uat-matrix-research.md` (Row 6)
+  * Reason: Requires interactive browser checks and visual confirmation tooling outside automated unit/integration suite.
+  * Impact: Medium
 
 ### Plan Deviations from Research
 
-None currently.
+* DD-01: Arena state was extended rather than replaced.
+  * Plan implied replacement-or-extension and research noted placeholder combat fields.
+  * Implementation retained legacy deterministic simulation fields and layered tile/bond collections for compatibility.
+  * Rationale: Minimize risk to existing room lifecycle while adding authoritative UAT-required state.
+* DD-02: Client-side bond projection currently recomputes locally from tile deltas.
+  * Plan intent emphasized authoritative bond projection readiness from server outputs.
+  * Implementation computes client bond visuals deterministically on the browser from acknowledged tile deltas.
+  * Rationale: Unblocks Phase 2 visuals quickly while keeping deterministic parity; authoritative bond projection remains a follow-on item.
 
 ## Implementation Paths Considered
 
@@ -44,3 +54,12 @@ None currently.
 * WI-03: Performance Budget for Bond Rendering — Add explicit render-budget targets for burst recompute and zoom/culling once the client visuals exist (High).
   * Source: Row 2 and Row 4 expectations currently rely on qualitative timing.
   * Dependency: Client rendering path implemented.
+* WI-04: Authoritative bond projection contract — Include bond outcomes in room join/delta projection to avoid client-side bond recomputation drift (High).
+  * Source: Phase 1 implementation completion report.
+  * Dependency: Phase 2 state and realtime projection implementation.
+* WI-05: Burst recompute integration coverage — Add multi-placement integration tests asserting bounded recompute event fanout and skip/completed counts (Medium).
+  * Source: Phase 1 implementation completion report.
+  * Dependency: Phase 4 automated regression expansion.
+* WI-06: Authoritative bond payload delivery for client deltas — Include bond outcomes in room join/delta messages to remove client recompute responsibility (High).
+  * Source: Phase 2 implementation validation.
+  * Dependency: Phase 4 regression updates and any room payload contract changes.
