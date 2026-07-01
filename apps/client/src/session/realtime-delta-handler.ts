@@ -34,6 +34,7 @@ export interface DeltaAckPayload {
  * Only called for non-duplicate deltas in sequence order
  */
 export type ApplyDeltaCallback = (delta: RealtimeDeltaPayload) => void | Promise<void>;
+export type DeltaAckObserver = (ack: DeltaAckPayload) => void | Promise<void>;
 
 /**
  * Client-side realtime delta handler
@@ -45,7 +46,8 @@ export class RealtimeDeltaHandler {
 
   constructor(
     private readonly room: { on(event: string, handler: (data: unknown) => void): void; send(event: string, data: unknown): void },
-    private readonly applyDeltaCallback: ApplyDeltaCallback
+    private readonly applyDeltaCallback: ApplyDeltaCallback,
+    private readonly onAckEmitted?: DeltaAckObserver
   ) {}
 
   /**
@@ -105,7 +107,7 @@ export class RealtimeDeltaHandler {
     // - For first-seen (new): confirms receipt and apply
     // - For duplicates: tells server to clear pending entry and stop retransmitting
     // This deterministic "always ack" policy reduces retry noise
-    this.emitAck(delta.sequenceId);
+    await this.emitAck(delta.sequenceId);
   }
 
   /**
@@ -123,11 +125,14 @@ export class RealtimeDeltaHandler {
    * Emit delta ack message to server
    * Server uses ack to clear pending entry and stop retransmitting
    */
-  private emitAck(sequenceId: string): void {
+  private async emitAck(sequenceId: string): Promise<void> {
     const ackPayload: DeltaAckPayload = {
       sequenceId
     };
     this.room.send("delta_ack", ackPayload);
+    if (this.onAckEmitted) {
+      await this.onAckEmitted(ackPayload);
+    }
   }
 }
 
@@ -137,9 +142,10 @@ export class RealtimeDeltaHandler {
  */
 export function createRealtimeDeltaHandler(
   room: { on(event: string, handler: (data: unknown) => void): void; send(event: string, data: unknown): void },
-  applyDeltaCallback: ApplyDeltaCallback
+  applyDeltaCallback: ApplyDeltaCallback,
+  onAckEmitted?: DeltaAckObserver
 ): RealtimeDeltaHandler {
-  const handler = new RealtimeDeltaHandler(room, applyDeltaCallback);
+  const handler = new RealtimeDeltaHandler(room, applyDeltaCallback, onAckEmitted);
   handler.start();
   return handler;
 }

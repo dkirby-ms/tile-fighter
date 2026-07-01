@@ -210,6 +210,19 @@ describe("RealtimeDeltaHandler", () => {
       expect(ackCalls[1][1].sequenceId).toBe("2");
       expect(ackCalls[2][1].sequenceId).toBe("1");
     });
+
+    it("invokes ack observer callback when ack is emitted", async () => {
+      const room = createMockRoom();
+      const applyDeltaMock = vi.fn(async () => undefined);
+      const ackObserver = vi.fn(async () => undefined);
+      const handler = new RealtimeDeltaHandler(room as any, applyDeltaMock, ackObserver);
+      handler.start();
+
+      await (room as any)._triggerDelta(makeTestDelta("11"));
+
+      expect(ackObserver).toHaveBeenCalledOnce();
+      expect(ackObserver).toHaveBeenCalledWith({ sequenceId: "11" });
+    });
   });
 
   describe("sequence ID comparison", () => {

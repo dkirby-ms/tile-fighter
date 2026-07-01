@@ -34,5 +34,63 @@ export {
 export type {
 	RealtimeDeltaPayload,
 	DeltaAckPayload,
-	ApplyDeltaCallback
+	ApplyDeltaCallback,
+	DeltaAckObserver
 } from "./session/realtime-delta-handler.js";
+export {
+	createInitialCreatorToolState,
+	reduceCreatorToolState,
+	reduceCreatorToolStateWithMeta,
+	DEFAULT_CREATOR_PALETTE
+} from "./creator/tool-state.js";
+export type {
+	CreatorToolState,
+	CreatorToolStateAction,
+	CreatorToolTransitionMeta,
+	CreatorToolTransitionResult,
+	CreatorPaletteConfig,
+	CreatorTargetCell,
+	PendingPlacementInfo,
+	OptimisticPlacementStatus
+} from "./creator/tool-state.js";
+export {
+	derivePlacementPreview,
+	deriveOccupancyLookup,
+	derivePlacementPreviewBoundaryState,
+	shouldEmitPlacementPreviewShown
+} from "./creator/placement-preview.js";
+export type {
+	PlacementPreviewStatus,
+	PlacementPreviewResult,
+	PlacementOccupancyCell,
+	PlacementPreviewBoundaryState
+} from "./creator/placement-preview.js";
+export {
+	sanitizePlacementSubmitInput,
+	createPlacementCommandId,
+	isValidPlacementCommandId
+} from "./creator/placement-input.js";
+export type {
+	PlacementSubmitInput,
+	PlacementInputOptions,
+	PlacementInputIssue,
+	PlacementInputIssueCode,
+	PlacementInputSanitizeResult
+} from "./creator/placement-input.js";
+export { placeTile } from "./creator/placement-caller.js";
+export type {
+	PlacementCallerFailure,
+	PlacementCallerFailureClass,
+	PlacementSubmitResult,
+	PlacementCallerDependencies,
+	PlacementCallerOptions
+} from "./creator/placement-caller.js";
+export { CreatorTelemetryAdapter } from "./creator/creator-telemetry.js";
+export type {
+	CreatorTelemetryEventName,
+	CreatorTelemetryEvent,
+	CreatorTelemetrySink,
+	CreatorTelemetryOptions,
+	PlacementPreviewShownEventInput,
+	CreatorTransitionTelemetryInput
+} from "./creator/creator-telemetry.js";

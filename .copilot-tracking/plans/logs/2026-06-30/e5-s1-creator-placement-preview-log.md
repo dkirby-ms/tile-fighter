@@ -15,10 +15,6 @@ Gaps and differences identified between research findings and the implementation
   * Source: .copilot-tracking/research/subagents/2026-06-30/e5-s1-planning-research.md
   * Reason: Research calls out the need to clarify event payload schema beyond the required names, while the plan only commits to a bounded local adapter with minimal payloads.
   * Impact: Analytics integration and payload stability may require a later contract decision.
-* DR-03: The plan does not identify the occupancy data seam needed for blocked previews.
-  * Source: .copilot-tracking/research/subagents/2026-06-30/e5-s1-planning-research.md
-  * Reason: Research states preview occupancy must come from replay bootstrap plus realtime deltas, but the plan only names the evaluator and does not assign the source of occupancy input.
-  * Impact: Blocked indicator behavior is under-specified until the occupancy source and wiring seam are named.
 
 ### Plan Deviations from Research
 
@@ -60,3 +56,8 @@ Gaps and differences identified between research findings and the implementation
 * WI-03: Realtime ack matching contract hardening - If implementation reveals race ambiguity, formalize ack correlation contract for placement commandIds. (Medium)
   * Source: DD-03
   * Dependency: E5-S1 implementation telemetry and integration test outcomes
+
+## Implementation Outcome Notes
+
+* E5-S1 completed without blocking issues.
+* DR-02 remains intentionally deferred: telemetry event names are implemented with bounded local payloads, while cross-story telemetry schema standardization remains follow-on work (WI-02).

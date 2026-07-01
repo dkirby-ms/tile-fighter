@@ -1,5 +1,5 @@
 ---
-applyTo: '.copilot-tracking/changes/2026-06-30/e5-s1-creator-placement-preview-changes.md'
+applyTo: '.copilot-tracking/plans/2026-06-30/e5-s1-creator-placement-preview-plan.instructions.md'
 ---
 <!-- markdownlint-disable-file -->
 # Implementation Plan: E5-S1 Creator Placement Preview
@@ -49,39 +49,39 @@ Implement E5-S1 by adding deterministic creator tool-state, pure placement previ
 
 ## Implementation Checklist
 
-### [ ] Implementation Phase 1: Deterministic creator tool and preview foundations
+### [x] Implementation Phase 1: Deterministic creator tool and preview foundations
 
 <!-- parallelizable: false -->
 
-* [ ] Step 1.1: Add deterministic tool-state reducer and creator exports
+* [x] Step 1.1: Add deterministic tool-state reducer and creator exports
   * Details: .copilot-tracking/details/2026-06-30/e5-s1-creator-placement-preview-details.md (Lines 11-30)
-* [ ] Step 1.2: Add pure placement preview evaluator and explicit reducer plus preview unit coverage
+* [x] Step 1.2: Add pure placement preview evaluator and explicit reducer plus preview unit coverage
   * Details: .copilot-tracking/details/2026-06-30/e5-s1-creator-placement-preview-details.md (Lines 32-52)
-* [ ] Step 1.3: Validate phase changes
+* [x] Step 1.3: Validate phase changes
   * Run lint, unit tests, and build for @game/client
 
-### [ ] Implementation Phase 2: Submission path, optimistic lifecycle, and telemetry
+### [x] Implementation Phase 2: Submission path, optimistic lifecycle, and telemetry
 
 <!-- parallelizable: false -->
 
-* [ ] Step 2.1: Add input sanitization and placement submit adapter
+* [x] Step 2.1: Add input sanitization and placement submit adapter
   * Details: .copilot-tracking/details/2026-06-30/e5-s1-creator-placement-preview-details.md (Lines 62-83)
-* [ ] Step 2.2: Add deterministic telemetry adapter for required E5-S1 events
+* [x] Step 2.2: Add deterministic telemetry adapter for required E5-S1 events
   * Details: .copilot-tracking/details/2026-06-30/e5-s1-creator-placement-preview-details.md (Lines 85-103)
-* [ ] Step 2.3: Add optimistic indicator lifecycle with ack-preferred clear policy
+* [x] Step 2.3: Add optimistic indicator lifecycle with ack-preferred clear policy
   * Details: .copilot-tracking/details/2026-06-30/e5-s1-creator-placement-preview-details.md (Lines 108-132)
-* [ ] Step 2.4: Validate phase changes
+* [x] Step 2.4: Validate phase changes
   * Run lint, unit tests, integration tests, and build for @game/client
 
-### [ ] Implementation Phase 3: Validation
+### [x] Implementation Phase 3: Validation
 
 <!-- parallelizable: false -->
 
-* [ ] Step 3.1: Run full project validation
+* [x] Step 3.1: Run full project validation
   * Execute lint, build, and test commands for @game/client and workspace-level checks
-* [ ] Step 3.2: Fix minor validation issues
+* [x] Step 3.2: Fix minor validation issues
   * Iterate on lint, type, and test failures local to E5-S1 scope
-* [ ] Step 3.3: Report blocking issues
+* [x] Step 3.3: Report blocking issues
   * Document unresolved telemetry schema decisions in planning log and follow-on items
 
 ## Planning Log
