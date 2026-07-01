@@ -19,6 +19,10 @@ Gaps and differences identified between research findings and the implementation
 ### Plan Deviations from Research
 
 * None currently. Existing plan approach aligns with the selected research recommendation (Scenario 2) and does not introduce contradictory implementation direction.
+* DD-01: Temporary client-local artifact path appeared during perf artifact generation and was removed.
+  * Plan specifies: Perf artifact target at apps/server/artifacts/e5-s2-pan-zoom-budget.json.
+  * Implementation differs: A duplicate was generated at apps/client/apps/server/artifacts/e5-s2-pan-zoom-budget.json during an intermediate run and then deleted per user instruction.
+  * Rationale: Keep artifact location aligned with plan and avoid committing generated client-local duplicates.
 
 ## Implementation Paths Considered
 
@@ -51,3 +55,8 @@ Gaps and differences identified between research findings and the implementation
 * WI-03: Add verify-release E5-S2 gate - Extend post-deploy checks to assert E5-S2 perf artifact compliance. (Medium)
   * Source: Research harness gap and Step 3.3 planning
   * Dependency: WI-02 threshold definition
+
+## User Decisions
+
+* ID-01: Remove accidental client-local artifact path - Option selected: delete generated apps/client/apps subtree and continue.
+  * Rationale: Preserve planned artifact location and keep repository clean of unintended generated output.

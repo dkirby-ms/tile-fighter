@@ -52,54 +52,54 @@ Implement E5-S2 by adding deterministic client camera state, bounded viewport ma
 
 ## Implementation Checklist
 
-### [ ] Implementation Phase 1: Deterministic navigation and viewport math foundations
+### [x] Implementation Phase 1: Deterministic navigation and viewport math foundations
 
 <!-- parallelizable: false -->
 
-* [ ] Step 1.1: Add camera-state reducer and clamps for pan/zoom transitions
+* [x] Step 1.1: Add camera-state reducer and clamps for pan/zoom transitions
   * Details: .copilot-tracking/details/2026-07-01/e5-s2-pan-zoom-viewport-culling-details.md (Lines 11-30)
-* [ ] Step 1.2: Add viewport derivation math that converts camera state into bounded `RegionDiffViewport` values
+* [x] Step 1.2: Add viewport derivation math that converts camera state into bounded `RegionDiffViewport` values
   * Details: .copilot-tracking/details/2026-07-01/e5-s2-pan-zoom-viewport-culling-details.md (Lines 32-50)
-* [ ] Step 1.3: Add unit tests for camera invariants and viewport bounds normalization
+* [x] Step 1.3: Add unit tests for camera invariants and viewport bounds normalization
   * Details: .copilot-tracking/details/2026-07-01/e5-s2-pan-zoom-viewport-culling-details.md (Lines 52-63)
-* [ ] Step 1.4: Validate phase changes
+* [x] Step 1.4: Validate phase changes
   * Run lint, unit tests, and build for @game/client
 
-### [ ] Implementation Phase 2: Viewport fetch orchestration and local culling
+### [x] Implementation Phase 2: Viewport fetch orchestration and local culling
 
 <!-- parallelizable: false -->
 
-* [ ] Step 2.1: Add viewport diff caller with debounce, in-flight coalescing, and latest-wins response handling
+* [x] Step 2.1: Add viewport diff caller with debounce, in-flight coalescing, and latest-wins response handling
   * Details: .copilot-tracking/details/2026-07-01/e5-s2-pan-zoom-viewport-culling-details.md (Lines 72-95)
-* [ ] Step 2.2: Add visible-tile culling derivation for draw candidate reduction
+* [x] Step 2.2: Add visible-tile culling derivation for draw candidate reduction
   * Details: .copilot-tracking/details/2026-07-01/e5-s2-pan-zoom-viewport-culling-details.md (Lines 97-111)
-* [ ] Step 2.3: Validate phase changes
+* [x] Step 2.3: Validate phase changes
   * Run lint, unit tests, integration tests, and build for @game/client
 
-### [ ] Implementation Phase 3: Telemetry, integration flow coverage, and harness evidence
+### [x] Implementation Phase 3: Telemetry, integration flow coverage, and harness evidence
 
 <!-- parallelizable: false -->
 
-* [ ] Step 3.1: Emit `viewport_changed` and `zoom_level_changed` events at deterministic transition boundaries
+* [x] Step 3.1: Emit `viewport_changed` and `zoom_level_changed` events at deterministic transition boundaries
   * Details: .copilot-tracking/details/2026-07-01/e5-s2-pan-zoom-viewport-culling-details.md (Lines 120-138)
-* [ ] Step 3.2: Add integration test for camera movement -> bounded viewport request -> deterministic visible-set update
+* [x] Step 3.2: Add integration test for camera movement -> bounded viewport request -> deterministic visible-set update
   * Details: .copilot-tracking/details/2026-07-01/e5-s2-pan-zoom-viewport-culling-details.md (Lines 140-159)
-* [ ] Step 3.3: Add E5-S2 perf artifact generation path for fps/memory evidence and document verify-release extension point
+* [x] Step 3.3: Add E5-S2 perf artifact generation path for fps/memory evidence and document verify-release extension point
   * Details: .copilot-tracking/details/2026-07-01/e5-s2-pan-zoom-viewport-culling-details.md (Lines 161-178)
-* [ ] Step 3.4: Add E2-S4 compatibility regression coverage for impacted navigation and viewport seams
+* [x] Step 3.4: Add E2-S4 compatibility regression coverage for impacted navigation and viewport seams
   * Details: .copilot-tracking/details/2026-07-01/e5-s2-pan-zoom-viewport-culling-details.md (Lines 180-196)
-* [ ] Step 3.5: Validate phase changes
+* [x] Step 3.5: Validate phase changes
   * Run lint, unit/integration tests, targeted perf harness checks, and E2-S4 compatibility assertions
 
-### [ ] Implementation Phase 4: Validation
+### [x] Implementation Phase 4: Validation
 
 <!-- parallelizable: false -->
 
-* [ ] Step 4.1: Run full project validation
+* [x] Step 4.1: Run full project validation
   * Execute lint/build/test for @game/client, E2-S4 regression checks, and workspace-level lint/test/build checks
-* [ ] Step 4.2: Fix minor validation issues
+* [x] Step 4.2: Fix minor validation issues
   * Iterate on localized lint, type, and test failures within E5-S2 scope
-* [ ] Step 4.3: Report blocking issues
+* [x] Step 4.3: Report blocking issues
   * Document issues requiring additional research and create follow-on work items rather than widening E5-S2 implementation scope
 
 ## Planning Log

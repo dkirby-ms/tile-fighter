@@ -2,7 +2,9 @@ export type CreatorTelemetryEventName =
   | "palette_opened"
   | "shape_selected"
   | "color_selected"
-  | "placement_preview_shown";
+  | "placement_preview_shown"
+  | "viewport_changed"
+  | "zoom_level_changed";
 
 export interface CreatorTelemetryEvent {
   name: CreatorTelemetryEventName;
@@ -32,7 +34,31 @@ export interface CreatorTransitionTelemetryInput {
   selectedColor: string | null;
 }
 
+export interface ViewportChangedTelemetryInput {
+  minCellX: number;
+  maxCellX: number;
+  minCellY: number;
+  maxCellY: number;
+  area: number;
+}
+
+export interface ZoomLevelChangedTelemetryInput {
+  zoom: number;
+}
+
+export interface CameraTelemetryBoundaryInput {
+  viewportChanged: boolean;
+  zoomLevelChanged: boolean;
+  viewport: ViewportChangedTelemetryInput;
+  zoom: ZoomLevelChangedTelemetryInput;
+}
+
 const MAX_LABEL_LENGTH = 32;
+const MIN_CELL_COORDINATE = -100_000;
+const MAX_CELL_COORDINATE = 100_000;
+const MAX_VIEWPORT_AREA = 1_000_000;
+const MIN_ZOOM = 0.0001;
+const MAX_ZOOM = 1_000;
 
 export class CreatorTelemetryAdapter {
   private readonly now: () => number;
@@ -67,6 +93,32 @@ export class CreatorTelemetryAdapter {
       cellX: input.cellX,
       cellY: input.cellY
     });
+  }
+
+  emitViewportChanged(input: ViewportChangedTelemetryInput): void {
+    this.emit("viewport_changed", {
+      minCellX: sanitizeCellCoordinate(input.minCellX),
+      maxCellX: sanitizeCellCoordinate(input.maxCellX),
+      minCellY: sanitizeCellCoordinate(input.minCellY),
+      maxCellY: sanitizeCellCoordinate(input.maxCellY),
+      area: sanitizeViewportArea(input.area)
+    });
+  }
+
+  emitZoomLevelChanged(input: ZoomLevelChangedTelemetryInput): void {
+    this.emit("zoom_level_changed", {
+      zoom: sanitizeZoom(input.zoom)
+    });
+  }
+
+  emitCameraTelemetryBoundary(input: CameraTelemetryBoundaryInput): void {
+    if (input.viewportChanged) {
+      this.emitViewportChanged(input.viewport);
+    }
+
+    if (input.zoomLevelChanged) {
+      this.emitZoomLevelChanged(input.zoom);
+    }
   }
 
   emitTransition(input: CreatorTransitionTelemetryInput): void {
@@ -136,4 +188,29 @@ function sanitizePayload(
   }
 
   return next;
+}
+
+function sanitizeCellCoordinate(value: number): number {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+
+  return Math.max(MIN_CELL_COORDINATE, Math.min(MAX_CELL_COORDINATE, Math.floor(value)));
+}
+
+function sanitizeViewportArea(value: number): number {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+
+  return Math.max(1, Math.min(MAX_VIEWPORT_AREA, Math.floor(value)));
+}
+
+function sanitizeZoom(value: number): number {
+  if (!Number.isFinite(value)) {
+    return 1;
+  }
+
+  const clamped = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, value));
+  return Math.round(clamped * 1_000) / 1_000;
 }

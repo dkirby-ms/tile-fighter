@@ -92,5 +92,47 @@ export type {
 	CreatorTelemetrySink,
 	CreatorTelemetryOptions,
 	PlacementPreviewShownEventInput,
-	CreatorTransitionTelemetryInput
+	CreatorTransitionTelemetryInput,
+	ViewportChangedTelemetryInput,
+	ZoomLevelChangedTelemetryInput,
+	CameraTelemetryBoundaryInput
 } from "./creator/creator-telemetry.js";
+export {
+	createInitialCameraState,
+	reduceCameraState,
+	reduceCameraStateWithBoundary,
+	deriveCameraTransitionBoundary,
+	clampCameraState,
+	clampCameraCenter,
+	clampCameraZoom,
+	normalizeCameraBounds,
+	normalizeCameraZoomBounds,
+	deriveCameraBoundsFromMap
+} from "./navigation/camera-state.js";
+export type {
+	CameraBounds,
+	CameraZoomBounds,
+	CameraState,
+	CameraAction,
+	CreateInitialCameraStateInput,
+	CameraTransitionBoundary,
+	CameraStateTransition
+} from "./navigation/camera-state.js";
+export {
+	deriveViewportFromCamera,
+	normalizeViewportToBounds,
+	normalizeViewportToPolicy,
+	deriveViewportArea
+} from "./navigation/viewport-math.js";
+export type { ViewportDerivationInput } from "./navigation/viewport-math.js";
+export { createViewportDiffCaller } from "./navigation/viewport-caller.js";
+export type {
+	QueueViewportDiffInput,
+	ViewportCallerError,
+	ViewportDiffCallerObservers,
+	CreateViewportDiffCallerOptions,
+	ViewportDiffCallerDependencies,
+	ViewportDiffCaller
+} from "./navigation/viewport-caller.js";
+export { deriveVisibleTiles } from "./navigation/viewport-culling.js";
+export type { TileBounds, CullableTile } from "./navigation/viewport-culling.js";

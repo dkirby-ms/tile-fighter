@@ -289,6 +289,11 @@ jobs:
           );
           NODE
 
+      # E5-S2 extension point:
+      # Run `npm run -w @game/client test -- e5-s2-pan-zoom-perf` before this assertion
+      # to generate apps/server/artifacts/e5-s2-pan-zoom-budget.json, then enable a
+      # budget assertion block analogous to E3-S4 for post-deploy enforcement.
+
       - name: Upload verification evidence artifacts
         uses: actions/upload-artifact@v4
         with:
