@@ -266,7 +266,7 @@ describe("Tile persistence integration", () => {
 
     expect(tiles).toHaveLength(3);
     expect(tiles.map((t) => t.cell_x).sort()).toEqual([0, 0, 1]);
-    expect(tiles.map((t) => t.cell_y).sort()).toEqual([0, 1, 0]);
+    expect(tiles.map((t) => t.cell_y).sort()).toEqual([0, 0, 1]);
   });
 
   it.skipIf(!testsCanRun || !db)("should isolate tiles between regions", async () => {
