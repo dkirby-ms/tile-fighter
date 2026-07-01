@@ -221,3 +221,6 @@ export interface RegionDiffResponse {
     policy: RegionDiffPolicyMetadata;
   };
 }
+
+export { evaluateBondType } from "./bonding.js";
+export type { BondEvaluationTile, BondType } from "./bonding.js";

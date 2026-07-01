@@ -115,6 +115,24 @@ export class TelemetrySink {
   }
 
   /**
+   * Emit bonding_triggered when a successful placement evaluates to a bond type.
+   */
+  async emitBondingTriggered(input: {
+    bondType: "glow-chain" | "blend-gradient" | "pulse-rhythm";
+    regionId: string;
+    cellX: number;
+    cellY: number;
+  }): Promise<void> {
+    await this.emit("bonding_triggered", {
+      bond_type: input.bondType,
+      region_id: input.regionId,
+      cell_x: input.cellX,
+      cell_y: input.cellY,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  /**
    * Emit tile_place_rejected event for story-level placement rejection outcomes.
    */
   async emitTilePlaceRejected(

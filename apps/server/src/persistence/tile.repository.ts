@@ -10,6 +10,7 @@ import {
 } from "./db.js";
 import { hashPlacementCommandPayload } from "../domain/combat-simulation.service.js";
 import { TelemetrySink } from "../telemetry/telemetry-sink.js";
+import type { BondEvaluationTile } from "@game/shared-types";
 
 /**
  * Input type for tile insertion with required fields
@@ -914,4 +915,43 @@ export function createTileRepository(options?: {
   telemetrySink?: TelemetrySink | null;
 }): ITileRepository {
   return new TileRepository(options);
+}
+
+export async function selectBondNeighborhoodTiles(
+  db: Kysely<ServerDatabase>,
+  regionId: string,
+  centerCellX: number,
+  centerCellY: number,
+  radius = 1
+): Promise<BondEvaluationTile[]> {
+  // E4-S1 rules rely on orthogonal local context only. Querying exact coordinates
+  // keeps the post-commit bonding lookup deterministic and lightweight.
+  const leftX = centerCellX - radius;
+  const rightX = centerCellX + radius;
+  const upY = centerCellY - radius;
+  const downY = centerCellY + radius;
+
+  const rows = await db
+    .selectFrom("tiles")
+    .select(["cell_x", "cell_y", "color"])
+    .where("region_id", "=", regionId)
+    .where((eb) =>
+      eb.or([
+        eb.and([eb("cell_x", "=", leftX), eb("cell_y", "=", centerCellY)]),
+        eb.and([eb("cell_x", "=", rightX), eb("cell_y", "=", centerCellY)]),
+        eb.and([eb("cell_x", "=", centerCellX), eb("cell_y", "=", upY)]),
+        eb.and([eb("cell_x", "=", centerCellX), eb("cell_y", "=", downY)])
+      ])
+    )
+    .orderBy("cell_y", "asc")
+    .orderBy("cell_x", "asc")
+    .execute();
+
+  return rows
+    .filter((row) => !(row.cell_x === centerCellX && row.cell_y === centerCellY))
+    .map((row) => ({
+      cellX: row.cell_x,
+      cellY: row.cell_y,
+      color: row.color
+    }));
 }

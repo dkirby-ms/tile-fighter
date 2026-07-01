@@ -11,10 +11,10 @@ import { AuthService } from "../auth/auth-service.js";
 import { SessionLifecycleService } from "../session/session-lifecycle.service.js";
 import { Kysely } from "kysely";
 import { ServerDatabase } from "../persistence/db.js";
-import { ITileRepository } from "../persistence/tile.repository.js";
+import { ITileRepository, selectBondNeighborhoodTiles } from "../persistence/tile.repository.js";
 import { RegionSnapshotService } from "../domain/region-snapshot.service.js";
 import { RegionDiffService } from "../domain/region-diff.service.js";
-import { DEFAULT_REGION_DIFF_POLICY } from "@game/shared-types";
+import { DEFAULT_REGION_DIFF_POLICY, evaluateBondType } from "@game/shared-types";
 import { SessionCheckpointService } from "../session/session-checkpoint.service.js";
 import { DeltaFanoutCoordinator, type DeltaFanoutConfig } from "../domain/delta-fanout.service.js";
 import type { RealtimeDeltaPayload } from "../domain/delta-fanout.service.js";
@@ -193,6 +193,38 @@ export function createHttpApp(dependencies: HttpAppDependencies) {
             input.ownerId
           );
 
+          const hasQueryableDb = Boolean(
+            dependencies.db &&
+            typeof (dependencies.db as { selectFrom?: unknown }).selectFrom === "function"
+          );
+
+          const bondNeighborhood = hasQueryableDb
+            ? await selectBondNeighborhoodTiles(
+              dependencies.db!,
+              input.regionId,
+              input.cellX,
+              input.cellY
+            )
+            : [];
+
+          const bondType = evaluateBondType(
+            {
+              cellX: input.cellX,
+              cellY: input.cellY,
+              color: input.color
+            },
+            bondNeighborhood
+          );
+
+          if (bondType) {
+            await dependencies.telemetrySink.emitBondingTriggered({
+              bondType,
+              regionId: input.regionId,
+              cellX: input.cellX,
+              cellY: input.cellY
+            });
+          }
+
           // Dispatch fanout to subscribers in this region after successful commit
           if (dependencies.deltaFanoutRegistry && result.tile.sequenceId) {
             const fanoutEntry = dependencies.deltaFanoutRegistry.get(getDeltaFanoutRegistryKey(input.regionId));
@@ -210,7 +242,8 @@ export function createHttpApp(dependencies: HttpAppDependencies) {
                 stylePayload: input.stylePayload,
                 ownerId: input.ownerId,
                 sentAt: new Date().toISOString(),
-                retransmitAttempt: 0
+                retransmitAttempt: 0,
+                bondType
               };
 
               await fanoutEntry.coordinator.publish(
