@@ -7,21 +7,18 @@ Gaps and differences identified between research findings and the implementation
 
 ### Unaddressed Research Items
 
-* None currently.
-## Resolved During Planning
-
-* RD-01: Optimistic indicator clear policy selected as ack-preferred with immediate clear on terminal HTTP failure.
-  * Rationale: Aligns with backlog requirement that optimistic indicator persists until ack while still handling terminal error outcomes deterministically.
-  * Applied in: .copilot-tracking/details/2026-06-30/e5-s1-creator-placement-preview-details.md (Step 2.3)
-* RD-02: Deterministic reducer unit-test artifact added explicitly to implementation details.
-  * Rationale: Closes validator-identified gap for explicit deterministic test coverage planning.
-  * Applied in: .copilot-tracking/details/2026-06-30/e5-s1-creator-placement-preview-details.md (Step 1.1)
-* RD-03: Prior DR-01 reclassified as a scoped deviation rather than an unaddressed item.
-  * Rationale: Shared-type shape/color hardening is intentionally deferred in-scope and captured under DD-01 with follow-on work.
-  * Applied in: .copilot-tracking/plans/2026-06-30/e5-s1-creator-placement-preview-plan.instructions.md (Objectives, Phase 2.1)
-* RD-04: Prior DR-02 resolved by explicit telemetry adapter and deterministic emission/test steps.
-  * Rationale: Plan/details now define a telemetry module boundary, deterministic emission points, bounded payload guidance, and integration coverage.
-  * Applied in: .copilot-tracking/details/2026-06-30/e5-s1-creator-placement-preview-details.md (Step 2.2)
+* DR-01: Shared-type shape and color hardening is deferred out of E5-S1.
+  * Source: .copilot-tracking/research/2026-06-30/e5-s1-creator-placement-preview-research.md
+  * Reason: Research recommends optional shape and color unions in shared-types to reduce drift, but the plan keeps sanitization client-local and does not add a contract-hardening step.
+  * Impact: Client/server drift risk remains until follow-on work lands, which can weaken compile-time safety for allowed creator inputs.
+* DR-02: Telemetry payload schema is still undefined for E5-S1 events.
+  * Source: .copilot-tracking/research/subagents/2026-06-30/e5-s1-planning-research.md
+  * Reason: Research calls out the need to clarify event payload schema beyond the required names, while the plan only commits to a bounded local adapter with minimal payloads.
+  * Impact: Analytics integration and payload stability may require a later contract decision.
+* DR-03: The plan does not identify the occupancy data seam needed for blocked previews.
+  * Source: .copilot-tracking/research/subagents/2026-06-30/e5-s1-planning-research.md
+  * Reason: Research states preview occupancy must come from replay bootstrap plus realtime deltas, but the plan only names the evaluator and does not assign the source of occupancy input.
+  * Impact: Blocked indicator behavior is under-specified until the occupancy source and wiring seam are named.
 
 ### Plan Deviations from Research
 
@@ -29,6 +26,14 @@ Gaps and differences identified between research findings and the implementation
   * Research recommends: Consider promoting shape and color constraints to shared-types for stronger compile-time contract enforcement.
   * Plan implements: Client-local sanitization in E5-S1 with optional follow-on for shared-type hardening.
   * Rationale: Keeps E5-S1 bounded to required acceptance and avoids multi-package contract expansion.
+* DD-02: Use a local creator telemetry adapter rather than introducing a shared telemetry schema in E5-S1.
+  * Research recommends: Add telemetry events for palette opening, selection changes, and preview visibility, with payload shape left open.
+  * Plan implements: A bounded apps/client telemetry adapter that emits the required event names with minimal payloads.
+  * Rationale: Keeps telemetry deterministic and scoped to the client slice while leaving contract hardening for a later story.
+* DD-03: Use an ack-preferred optimistic clear policy.
+  * Research recommends: Resolve the clear boundary through implementation or follow-up decision.
+  * Plan implements: Keep optimistic state visible after a successful submit until realtime ack, then clear immediately on terminal HTTP failure.
+  * Rationale: Matches the acceptance wording that the optimistic indicator persists until ack while still avoiding stale pending state on hard failures.
 
 ## Implementation Paths Considered
 

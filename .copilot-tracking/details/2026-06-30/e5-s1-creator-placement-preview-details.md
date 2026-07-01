@@ -71,7 +71,7 @@ Files:
 * apps/client/tests/unit/placement-caller.test.ts - Response mapping tests.
 
 Discrepancy references:
-* DR-01
+* DD-01
 
 Success criteria:
 * Invalid input is rejected client-side before submit.
@@ -95,7 +95,7 @@ Files:
 * apps/client/tests/integration/e5-s1-placement-flow.test.ts - Verifies event emission sequence.
 
 Discrepancy references:
-* DR-02
+* DD-02
 
 Success criteria:
 * Required telemetry events emit exactly once per deterministic transition.
@@ -123,7 +123,7 @@ Files:
 * apps/client/tests/integration/e5-s1-placement-flow.test.ts - Optimistic indicator appears until ack/result resolution.
 
 Discrepancy references:
-* DR-03
+* DD-03
 
 Success criteria:
 * Optimistic indicator appears on valid placement submit.
