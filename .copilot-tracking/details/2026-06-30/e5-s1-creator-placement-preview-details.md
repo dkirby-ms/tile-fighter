@@ -17,6 +17,8 @@ Files:
 * apps/client/src/creator/tool-state.ts - Reducer, actions, and deterministic transition helpers.
 * apps/client/tests/unit/tool-state.test.ts - Deterministic reducer transition tests for palette, shape, color, hover, and optimistic state actions.
 * apps/client/src/index.ts - Export tool-state module.
+* apps/client/src/session/bootstrap-store.ts - Existing replay/bootstrap seam for seeding occupancy state.
+* apps/client/src/session/realtime-delta-handler.ts - Existing realtime seam for updating occupancy state after deltas.
 
 Success criteria:
 * Tool state transitions are pure and do not perform network I/O.
@@ -40,9 +42,13 @@ Files:
 Success criteria:
 * Occupied target always yields blocked preview status.
 * Invalid shape/color/coordinates yield invalid-input status and prevent placement submission.
+* Occupancy input is seeded from replay/bootstrap state and updated from realtime deltas so blocked hover remains deterministic after reconnect.
 
 Context references:
 * .copilot-tracking/research/2026-06-30/e5-s1-creator-placement-preview-research.md (Lines 35-43) - E5-S1 preview and blocked requirements.
+* .copilot-tracking/research/subagents/2026-06-30/e5-s1-planning-research.md (Lines 74-82) - Occupancy source should come from replay bootstrap plus realtime deltas.
+* apps/client/src/session/bootstrap-store.ts - Bootstrap/replay occupancy seed seam.
+* apps/client/src/session/realtime-delta-handler.ts - Realtime delta occupancy update seam.
 
 Dependencies:
 * Step 1.1 completion

@@ -58,5 +58,5 @@ Gaps and differences identified between research findings and the implementation
   * Source: DR-02
   * Dependency: Analytics owner alignment
 * WI-03: Realtime ack matching contract hardening - If implementation reveals race ambiguity, formalize ack correlation contract for placement commandIds. (Medium)
-  * Source: RD-01
+  * Source: DD-03
   * Dependency: E5-S1 implementation telemetry and integration test outcomes
