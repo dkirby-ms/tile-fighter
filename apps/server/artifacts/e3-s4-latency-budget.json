@@ -1,15 +1,15 @@
 {
   "scenarioId": "e3-s4-latency-budget",
-  "timestamp": "2026-06-30T20:50:35.136Z",
+  "timestamp": "2026-07-01T14:10:08.024Z",
   "environment": {
     "ccu": 50,
     "durationMinutes": 0.5,
     "runClass": "local"
   },
   "metrics": {
-    "placementAckMedianMs": 191,
-    "reconnectP95Ms": 51,
-    "roundsCompleted": 126,
+    "placementAckMedianMs": 215,
+    "reconnectP95Ms": 52,
+    "roundsCompleted": 128,
     "placementAckSampleCount": 5,
     "reconnectSampleCount": 10
   },
@@ -18,8 +18,8 @@
     "reconnectP95Ms": 3000
   },
   "budgetStatus": {
-    "placementAckPassed": true,
+    "placementAckPassed": false,
     "reconnectP95Passed": true,
-    "allPassed": true
+    "allPassed": false
   }
 }

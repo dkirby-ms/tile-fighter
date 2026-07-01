@@ -7,3 +7,4 @@ coverage
 npm-debug.log*
 artifacts/*.json
 apps/server/artifacts/*.json
+apps/client/apps/server/artifacts/*.json

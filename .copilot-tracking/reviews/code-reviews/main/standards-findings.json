@@ -1,0 +1,19 @@
+{
+  "summary": "Standards review completed for 1 changed file. No coding-standards skills matched extension(s): gitignore, so no skill-traceable standards findings were emitted.",
+  "verdict": "approve",
+  "severity_counts": {
+    "critical": 0,
+    "high": 0,
+    "medium": 0,
+    "low": 0
+  },
+  "changed_files": [
+    ".gitignore"
+  ],
+  "risk_assessment": "Low risk. Change adds a .gitignore entry for generated client artifact JSON files.",
+  "findings": [],
+  "positive_changes": [],
+  "testing_recommendations": [],
+  "recommended_actions": [],
+  "out_of_scope_observations": []
+}

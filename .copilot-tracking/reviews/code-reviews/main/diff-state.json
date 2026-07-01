@@ -1,0 +1,16 @@
+{
+  "branch": "main",
+  "base": "main",
+  "files": [
+    ".gitignore"
+  ],
+  "untrackedFiles": [
+    ".copilot-tracking/pr/pr-reference.xml"
+  ],
+  "extensions": [
+    "gitignore"
+  ],
+  "tshirtSize": "XS",
+  "diffPatchPath": ".copilot-tracking/pr/pr-reference.xml",
+  "findingsFolder": ".copilot-tracking/reviews/code-reviews/main/"
+}

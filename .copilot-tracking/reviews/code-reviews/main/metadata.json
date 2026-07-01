@@ -1,0 +1,15 @@
+{
+  "schema_version": "1",
+  "branch": "main",
+  "head_commit": "577c8489482b6bf7ecee6d4c539b9f01dce9dd65",
+  "reviewed_at": "2026-07-01T14:09:14Z",
+  "verdict": "approve",
+  "files_changed": [".gitignore"],
+  "findings_count": {
+    "critical": 0,
+    "high": 0,
+    "medium": 0,
+    "low": 0
+  },
+  "reviewer": "code-review-full"
+}
