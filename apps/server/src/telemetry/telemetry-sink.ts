@@ -133,6 +133,72 @@ export class TelemetrySink {
   }
 
   /**
+   * Emit bond_recalc_started for queued local recompute execution start.
+   */
+  async emitBondRecalcStarted(input: {
+    regionId: string;
+    cellX: number;
+    cellY: number;
+    queueDepth: number;
+    queueLagMs: number;
+  }): Promise<void> {
+    await this.emit("bond_recalc_started", {
+      region_id: input.regionId,
+      cell_x: input.cellX,
+      cell_y: input.cellY,
+      queue_depth: input.queueDepth,
+      queue_lag_ms: input.queueLagMs,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  /**
+   * Emit bond_recalc_completed when queued local recompute finishes.
+   */
+  async emitBondRecalcCompleted(input: {
+    regionId: string;
+    cellX: number;
+    cellY: number;
+    queueDepth: number;
+    queueLagMs: number;
+    bondType: "glow-chain" | "blend-gradient" | "pulse-rhythm" | null;
+    emittedBondEvent: boolean;
+  }): Promise<void> {
+    await this.emit("bond_recalc_completed", {
+      region_id: input.regionId,
+      cell_x: input.cellX,
+      cell_y: input.cellY,
+      queue_depth: input.queueDepth,
+      queue_lag_ms: input.queueLagMs,
+      bond_type: input.bondType,
+      emitted_bond_event: input.emittedBondEvent,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  /**
+   * Emit bond_recalc_skipped when recompute work is intentionally skipped.
+   */
+  async emitBondRecalcSkipped(input: {
+    regionId: string;
+    cellX: number;
+    cellY: number;
+    queueDepth: number;
+    queueLagMs: number;
+    reason: "unchanged_fingerprint" | "queue_full" | "flood_protected";
+  }): Promise<void> {
+    await this.emit("bond_recalc_skipped", {
+      region_id: input.regionId,
+      cell_x: input.cellX,
+      cell_y: input.cellY,
+      queue_depth: input.queueDepth,
+      queue_lag_ms: input.queueLagMs,
+      reason: input.reason,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  /**
    * Emit tile_place_rejected event for story-level placement rejection outcomes.
    */
   async emitTilePlaceRejected(

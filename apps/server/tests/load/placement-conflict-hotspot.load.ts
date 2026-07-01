@@ -33,7 +33,10 @@ describe("Placement conflict hotspot load", () => {
         emitTilePlaceRejected: vi.fn(async () => undefined),
         emitTilePlaceThrottled: vi.fn(async () => undefined),
         emitTilePlaced: vi.fn(async () => undefined),
-        emitTileEdited: vi.fn(async () => undefined)
+        emitTileEdited: vi.fn(async () => undefined),
+        emitBondRecalcStarted: vi.fn(async () => undefined),
+        emitBondRecalcCompleted: vi.fn(async () => undefined),
+        emitBondRecalcSkipped: vi.fn(async () => undefined)
       } as unknown as TelemetrySink
     });
 
@@ -66,7 +69,10 @@ describe("Placement conflict hotspot load", () => {
       emitTilePlaceRejected: vi.fn(async () => undefined),
       emitTilePlaceThrottled: vi.fn(async () => undefined),
       emitTilePlaced: vi.fn(async () => undefined),
-      emitTileEdited: vi.fn(async () => undefined)
+      emitTileEdited: vi.fn(async () => undefined),
+      emitBondRecalcStarted: vi.fn(async () => undefined),
+      emitBondRecalcCompleted: vi.fn(async () => undefined),
+      emitBondRecalcSkipped: vi.fn(async () => undefined)
     } as unknown as TelemetrySink;
 
     const authService = {

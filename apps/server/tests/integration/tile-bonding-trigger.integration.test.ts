@@ -5,7 +5,9 @@ import { createHttpApp } from "../../src/http/app.js";
 import { buildAuthMiddleware } from "../../src/http/auth-middleware.js";
 import { SessionLifecycleService } from "../../src/session/session-lifecycle.service.js";
 import { TelemetrySink } from "../../src/telemetry/telemetry-sink.js";
-import { ITileRepository, TileRepository } from "../../src/persistence/tile.repository.js";
+import { ITileRepository, TileRepository, selectBondNeighborhoodTiles } from "../../src/persistence/tile.repository.js";
+import { BondRecomputeCoordinator, type BondRecomputeInput } from "../../src/domain/bond-recompute-coordinator.js";
+import { evaluateBondType } from "@game/shared-types";
 import {
   ServerDatabase,
   DatabaseRuntime,
@@ -48,6 +50,14 @@ describe("Tile bonding trigger integration", () => {
     await db.deleteFrom("tiles").execute();
   });
 
+  function buildBondFingerprint(item: BondRecomputeInput, bondType: string | null, neighbors: Array<{ cellX: number; cellY: number; color: string }>): string {
+    const neighborSignature = neighbors
+      .map((neighbor) => `${neighbor.cellX},${neighbor.cellY},${neighbor.color}`)
+      .join("|");
+
+    return `${item.regionId}:${item.cellX}:${item.cellY}:${item.color}:${bondType ?? "none"}:${neighborSignature}`;
+  }
+
   function createAppWithTelemetrySpy(subject: string, tileRepository: ITileRepository = repository) {
     const telemetrySink = {
       emit: vi.fn(async () => undefined),
@@ -55,7 +65,10 @@ describe("Tile bonding trigger integration", () => {
       emitTilePlaced: vi.fn(async () => undefined),
       emitTileEdited: vi.fn(async () => undefined),
       emitTilePlaceThrottled: vi.fn(async () => undefined),
-      emitBondingTriggered: vi.fn(async () => undefined)
+      emitBondingTriggered: vi.fn(async () => undefined),
+      emitBondRecalcStarted: vi.fn(async () => undefined),
+      emitBondRecalcCompleted: vi.fn(async () => undefined),
+      emitBondRecalcSkipped: vi.fn(async () => undefined)
     } as unknown as TelemetrySink;
 
     const authService = {
@@ -77,6 +90,43 @@ describe("Tile bonding trigger integration", () => {
       telemetrySink
     });
 
+    const bondRecomputeCoordinator = new BondRecomputeCoordinator(
+      {
+        maxPendingItems: 32,
+        maxDrainBatchSize: 8,
+        maxQueueWaitMs: 0
+      },
+      async (item) => {
+        const neighborhood = await selectBondNeighborhoodTiles(db!, item.regionId, item.cellX, item.cellY);
+        const bondType = evaluateBondType(
+          {
+            cellX: item.cellX,
+            cellY: item.cellY,
+            color: item.color
+          },
+          neighborhood
+        );
+
+        return {
+          fingerprint: buildBondFingerprint(item, bondType, neighborhood),
+          bondType
+        };
+      },
+      async (item, bondType) => {
+        await telemetrySink.emitBondingTriggered({
+          bondType,
+          regionId: item.regionId,
+          cellX: item.cellX,
+          cellY: item.cellY
+        });
+      },
+      {
+        onStarted: async () => undefined,
+        onCompleted: async () => undefined,
+        onSkipped: async () => undefined
+      }
+    );
+
     const app = createHttpApp({
       readinessCheck: async () => ({
         ok: true,
@@ -95,6 +145,7 @@ describe("Tile bonding trigger integration", () => {
       } as never,
       db: db!,
       tileRepository,
+      bondRecomputeCoordinator,
       tilePlaceThrottlePolicy: {
         maxRequests: 100,
         windowMs: 60_000
@@ -146,7 +197,9 @@ describe("Tile bonding trigger integration", () => {
       });
 
     expect(trigger.status).toBe(201);
-    expect(telemetrySink.emitBondingTriggered).toHaveBeenCalledTimes(1);
+    await vi.waitFor(() => {
+      expect(telemetrySink.emitBondingTriggered).toHaveBeenCalledTimes(1);
+    });
     expect(telemetrySink.emitBondingTriggered).toHaveBeenCalledWith({
       bondType: "glow-chain",
       regionId,

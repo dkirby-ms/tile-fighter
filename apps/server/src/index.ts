@@ -11,7 +11,7 @@ import {
   verifyDatabaseConnectivity,
   closeDatabaseRuntime
 } from "./persistence/db.js";
-import { createTileRepository } from "./persistence/tile.repository.js";
+import { createTileRepository, selectBondNeighborhoodTiles } from "./persistence/tile.repository.js";
 import { createRegionSnapshotRepository } from "./persistence/region-snapshot.repository.js";
 import { createRegionDiffRepository } from "./persistence/region-diff.repository.js";
 import { ArenaRoom } from "./rooms/arena.room.js";
@@ -24,6 +24,16 @@ import { createSessionCheckpointRepository } from "./persistence/session-checkpo
 import { SessionCheckpointService } from "./session/session-checkpoint.service.js";
 import { ReconnectTokenService } from "./auth/reconnect-token.service.js";
 import { type DeltaFanoutConfig } from "./domain/delta-fanout.service.js";
+import { BondRecomputeCoordinator, type BondRecomputeInput } from "./domain/bond-recompute-coordinator.js";
+import { evaluateBondType } from "@game/shared-types";
+
+function buildBondFingerprint(item: BondRecomputeInput, bondType: string | null, neighbors: Array<{ cellX: number; cellY: number; color: string }>): string {
+  const neighborSignature = neighbors
+    .map((neighbor) => `${neighbor.cellX},${neighbor.cellY},${neighbor.color}`)
+    .join("|");
+
+  return `${item.regionId}:${item.cellX}:${item.cellY}:${item.color}:${bondType ?? "none"}:${neighborSignature}`;
+}
 
 async function bootstrap(): Promise<void> {
   const runtimeConfig = readRuntimeConfig();
@@ -78,6 +88,75 @@ async function bootstrap(): Promise<void> {
     deltaOutboundCapPerConnection: runtimeConfig.deltaOutboundCapPerConnection || 128
   };
   const deltaFanoutRegistry: DeltaFanoutRegistry = new Map();
+  const bondRecomputeCoordinator = new BondRecomputeCoordinator(
+    {
+      maxPendingItems: runtimeConfig.bondRecomputeQueueMaxPending,
+      maxDrainBatchSize: runtimeConfig.bondRecomputeQueueDrainBatchSize,
+      maxQueueWaitMs: runtimeConfig.bondRecomputeQueueMaxWaitMs
+    },
+    async (item) => {
+      const neighborhood = await selectBondNeighborhoodTiles(
+        dbRuntime.db,
+        item.regionId,
+        item.cellX,
+        item.cellY
+      );
+
+      const bondType = evaluateBondType(
+        {
+          cellX: item.cellX,
+          cellY: item.cellY,
+          color: item.color
+        },
+        neighborhood
+      );
+
+      return {
+        fingerprint: buildBondFingerprint(item, bondType, neighborhood),
+        bondType
+      };
+    },
+    async (item, bondType) => {
+      await telemetrySink.emitBondingTriggered({
+        bondType,
+        regionId: item.regionId,
+        cellX: item.cellX,
+        cellY: item.cellY
+      });
+    },
+    {
+      onStarted: async (event) => {
+        await telemetrySink.emitBondRecalcStarted({
+          regionId: event.regionId,
+          cellX: event.cellX,
+          cellY: event.cellY,
+          queueDepth: event.queueDepth,
+          queueLagMs: event.queueLagMs
+        });
+      },
+      onCompleted: async (event) => {
+        await telemetrySink.emitBondRecalcCompleted({
+          regionId: event.regionId,
+          cellX: event.cellX,
+          cellY: event.cellY,
+          queueDepth: event.queueDepth,
+          queueLagMs: event.queueLagMs,
+          bondType: event.bondType,
+          emittedBondEvent: event.emittedBondEvent
+        });
+      },
+      onSkipped: async (event) => {
+        await telemetrySink.emitBondRecalcSkipped({
+          regionId: event.regionId,
+          cellX: event.cellX,
+          cellY: event.cellY,
+          queueDepth: event.queueDepth,
+          queueLagMs: event.queueLagMs,
+          reason: event.reason
+        });
+      }
+    }
+  );
 
   const readinessCheck = async (): Promise<ReadinessReport> => {
     try {
@@ -113,6 +192,7 @@ async function bootstrap(): Promise<void> {
     regionDiffService,
     deltaFanoutRegistry,
     deltaFanoutConfig,
+    bondRecomputeCoordinator,
     tilePlaceThrottlePolicy: {
       maxRequests: runtimeConfig.tilePlaceThrottleMaxRequests,
       windowMs: runtimeConfig.tilePlaceThrottleWindowMs,
@@ -144,6 +224,7 @@ async function bootstrap(): Promise<void> {
 
   registerGracefulShutdown(async () => {
     lifecycleService.stop();
+    bondRecomputeCoordinator.destroy();
     await gameServer.gracefullyShutdown();
     await new Promise<void>((resolve, reject) => {
       nodeServer.close((error) => {

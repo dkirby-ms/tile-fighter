@@ -38,7 +38,10 @@ const envSchema = z.object({
   DELTA_ACK_TIMEOUT_MS: z.coerce.number().int().positive().default(350),
   DELTA_RETRANSMIT_MAX_ATTEMPTS: z.coerce.number().int().positive().default(1),
   DELTA_ACK_PENDING_TTL_MS: z.coerce.number().int().positive().default(30_000),
-  DELTA_OUTBOUND_CAP_PER_CONNECTION: z.coerce.number().int().positive().default(128)
+  DELTA_OUTBOUND_CAP_PER_CONNECTION: z.coerce.number().int().positive().default(128),
+  BOND_RECOMPUTE_QUEUE_MAX_PENDING: z.coerce.number().int().positive().default(2_048),
+  BOND_RECOMPUTE_QUEUE_DRAIN_BATCH_SIZE: z.coerce.number().int().positive().default(64),
+  BOND_RECOMPUTE_QUEUE_MAX_WAIT_MS: z.coerce.number().int().nonnegative().default(20)
 });
 
 export type RuntimeConfig = {
@@ -73,6 +76,9 @@ export type RuntimeConfig = {
   deltaRetransmitMaxAttempts: number;
   deltaAckPendingTtlMs: number;
   deltaOutboundCapPerConnection: number;
+  bondRecomputeQueueMaxPending: number;
+  bondRecomputeQueueDrainBatchSize: number;
+  bondRecomputeQueueMaxWaitMs: number;
 };
 
 function splitCsv(input?: string): string[] {
@@ -124,6 +130,9 @@ export function readRuntimeConfig(): RuntimeConfig {
     deltaAckTimeoutMs: parsed.DELTA_ACK_TIMEOUT_MS,
     deltaRetransmitMaxAttempts: parsed.DELTA_RETRANSMIT_MAX_ATTEMPTS,
     deltaAckPendingTtlMs: parsed.DELTA_ACK_PENDING_TTL_MS,
-    deltaOutboundCapPerConnection: parsed.DELTA_OUTBOUND_CAP_PER_CONNECTION
+    deltaOutboundCapPerConnection: parsed.DELTA_OUTBOUND_CAP_PER_CONNECTION,
+    bondRecomputeQueueMaxPending: parsed.BOND_RECOMPUTE_QUEUE_MAX_PENDING,
+    bondRecomputeQueueDrainBatchSize: parsed.BOND_RECOMPUTE_QUEUE_DRAIN_BATCH_SIZE,
+    bondRecomputeQueueMaxWaitMs: parsed.BOND_RECOMPUTE_QUEUE_MAX_WAIT_MS
   };
 }

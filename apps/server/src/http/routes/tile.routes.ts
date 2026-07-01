@@ -26,6 +26,7 @@ type PlaceTileInput = {
   color: string;
   stylePayload: unknown;
   ownerId: string;
+  requestIp: string | null;
 };
 
 type PlaceTileOutcome =
@@ -189,7 +190,8 @@ export function createTileRoutes(dependencies: TileRoutesDependencies): Router {
       shape: req.body.shape,
       color: req.body.color,
       stylePayload: req.body.stylePayload,
-      ownerId: principal.tenantScopedSubject
+      ownerId: principal.tenantScopedSubject,
+      requestIp: req.ip ?? null
     });
 
     // All domain-specific failures (occupied, throttled) are mapped below.

@@ -11,13 +11,14 @@ import { AuthService } from "../auth/auth-service.js";
 import { SessionLifecycleService } from "../session/session-lifecycle.service.js";
 import { Kysely } from "kysely";
 import { ServerDatabase } from "../persistence/db.js";
-import { ITileRepository, selectBondNeighborhoodTiles } from "../persistence/tile.repository.js";
+import { ITileRepository } from "../persistence/tile.repository.js";
 import { RegionSnapshotService } from "../domain/region-snapshot.service.js";
 import { RegionDiffService } from "../domain/region-diff.service.js";
-import { DEFAULT_REGION_DIFF_POLICY, evaluateBondType } from "@game/shared-types";
+import { DEFAULT_REGION_DIFF_POLICY } from "@game/shared-types";
 import { SessionCheckpointService } from "../session/session-checkpoint.service.js";
 import { DeltaFanoutCoordinator, type DeltaFanoutConfig } from "../domain/delta-fanout.service.js";
 import type { RealtimeDeltaPayload } from "../domain/delta-fanout.service.js";
+import { BondRecomputeCoordinator } from "../domain/bond-recompute-coordinator.js";
 
 /**
  * Registry for room-scoped delta fanout coordinators indexed by regionId
@@ -48,7 +49,13 @@ export type HttpAppDependencies = {
   regionDiffService?: RegionDiffService;
   deltaFanoutRegistry?: DeltaFanoutRegistry;
   deltaFanoutConfig?: DeltaFanoutConfig;
+  bondRecomputeCoordinator?: BondRecomputeCoordinator;
   tilePlaceThrottlePolicy?: {
+    maxRequests: number;
+    windowMs: number;
+    ttlMs?: number;
+  };
+  bondRecomputeFloodPolicy?: {
     maxRequests: number;
     windowMs: number;
     ttlMs?: number;
@@ -67,6 +74,11 @@ export function createHttpApp(dependencies: HttpAppDependencies) {
 
   const tilePlaceThrottlePolicy = dependencies.tilePlaceThrottlePolicy ?? {
     maxRequests: 5,
+    windowMs: 60_000,
+    ttlMs: 24 * 60 * 60 * 1000
+  };
+  const bondRecomputeFloodPolicy = dependencies.bondRecomputeFloodPolicy ?? {
+    maxRequests: 30,
     windowMs: 60_000,
     ttlMs: 24 * 60 * 60 * 1000
   };
@@ -95,8 +107,11 @@ export function createHttpApp(dependencies: HttpAppDependencies) {
    * ~10k entries × ~100 bytes ≈ 1MB. Periodic cleanup keeps this bounded over time.
    */
   type ThrottleEntry = { lastActivityMs: number; attempts: number[] };
+  type RecomputeFloodEntry = { lastActivityMs: number; attempts: number[] };
   const tilePlacementThrottleByKey = new Map<string, ThrottleEntry>();
+  const bondRecomputeFloodByKey = new Map<string, RecomputeFloodEntry>();
   const tilePlaceThrottleTtlMs = tilePlaceThrottlePolicy.ttlMs ?? 24 * 60 * 60 * 1000;
+  const bondRecomputeFloodTtlMs = bondRecomputeFloodPolicy.ttlMs ?? 24 * 60 * 60 * 1000;
 
   // Periodic cleanup: every hour, remove entries older than TTL
   const cleanupIntervalMs = 60 * 60 * 1000; // 1 hour
@@ -105,6 +120,11 @@ export function createHttpApp(dependencies: HttpAppDependencies) {
     for (const [key, entry] of tilePlacementThrottleByKey) {
       if (now - entry.lastActivityMs > tilePlaceThrottleTtlMs) {
         tilePlacementThrottleByKey.delete(key);
+      }
+    }
+    for (const [key, entry] of bondRecomputeFloodByKey) {
+      if (now - entry.lastActivityMs > bondRecomputeFloodTtlMs) {
+        bondRecomputeFloodByKey.delete(key);
       }
     }
   }, cleanupIntervalMs);
@@ -193,36 +213,48 @@ export function createHttpApp(dependencies: HttpAppDependencies) {
             input.ownerId
           );
 
-          const hasQueryableDb = Boolean(
-            dependencies.db &&
-            typeof (dependencies.db as { selectFrom?: unknown }).selectFrom === "function"
-          );
+          const recomputeKey = `${input.ownerId}:${input.requestIp ?? "unknown-ip"}`;
+          const nowMs = Date.now();
+          const floodEntry = bondRecomputeFloodByKey.get(recomputeKey) ?? {
+            lastActivityMs: nowMs,
+            attempts: []
+          };
+          const floodCutoff = nowMs - bondRecomputeFloodPolicy.windowMs;
+          const floodRecentAttempts = floodEntry.attempts.filter((attemptedAtMs) => attemptedAtMs > floodCutoff);
+          const isFloodProtected = floodRecentAttempts.length >= bondRecomputeFloodPolicy.maxRequests;
 
-          const bondNeighborhood = hasQueryableDb
-            ? await selectBondNeighborhoodTiles(
-              dependencies.db!,
-              input.regionId,
-              input.cellX,
-              input.cellY
-            )
-            : [];
+          if (isFloodProtected) {
+            await dependencies.telemetrySink.emitBondRecalcSkipped({
+              regionId: input.regionId,
+              cellX: input.cellX,
+              cellY: input.cellY,
+              queueDepth: dependencies.bondRecomputeCoordinator?.getPendingCount() ?? 0,
+              queueLagMs: 0,
+              reason: "flood_protected"
+            });
+          } else {
+            floodRecentAttempts.push(nowMs);
+            floodEntry.lastActivityMs = nowMs;
+            floodEntry.attempts = floodRecentAttempts;
+            bondRecomputeFloodByKey.set(recomputeKey, floodEntry);
 
-          const bondType = evaluateBondType(
-            {
+            const enqueueResult = dependencies.bondRecomputeCoordinator?.enqueue({
+              regionId: input.regionId,
               cellX: input.cellX,
               cellY: input.cellY,
               color: input.color
-            },
-            bondNeighborhood
-          );
-
-          if (bondType) {
-            await dependencies.telemetrySink.emitBondingTriggered({
-              bondType,
-              regionId: input.regionId,
-              cellX: input.cellX,
-              cellY: input.cellY
             });
+
+            if (enqueueResult && !enqueueResult.accepted) {
+              await dependencies.telemetrySink.emitBondRecalcSkipped({
+                regionId: input.regionId,
+                cellX: input.cellX,
+                cellY: input.cellY,
+                queueDepth: dependencies.bondRecomputeCoordinator?.getPendingCount() ?? 0,
+                queueLagMs: 0,
+                reason: enqueueResult.reason ?? "queue_full"
+              });
+            }
           }
 
           // Dispatch fanout to subscribers in this region after successful commit
@@ -242,8 +274,7 @@ export function createHttpApp(dependencies: HttpAppDependencies) {
                 stylePayload: input.stylePayload,
                 ownerId: input.ownerId,
                 sentAt: new Date().toISOString(),
-                retransmitAttempt: 0,
-                bondType
+                retransmitAttempt: 0
               };
 
               await fanoutEntry.coordinator.publish(
