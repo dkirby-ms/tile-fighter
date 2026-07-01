@@ -1,0 +1,12 @@
+diff --git a/.gitignore b/.gitignore
+index c7b263d..fb8c863 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -6,4 +6,5 @@ coverage
+ .DS_Store
+ npm-debug.log*
+ artifacts/*.json
+-apps/server/artifacts/*.json
+\ No newline at end of file
++apps/server/artifacts/*.json
++apps/client/apps/server/artifacts/*.json

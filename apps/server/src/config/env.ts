@@ -15,6 +15,8 @@ const envSchema = z.object({
   ENTRA_AUDIENCE: z.string().min(1),
   ENTRA_JWKS_URL: z.string().url(),
   ENTRA_TOKEN_VERSION: z.enum(["1.0", "2.0"]).default("2.0"),
+  DEV_AUTH_MODE: z.enum(["enforce", "allow"]).default("enforce"),
+  DEV_AUTH_SHARED_SECRET: z.string().optional(),
   TENANT_MODE: z.enum(["single", "multi", "both"]).default("single"),
   ENTRA_TENANT_ID: z.string().optional(),
   ALLOWED_TENANT_IDS: z.string().optional(),
@@ -49,6 +51,8 @@ export type RuntimeConfig = {
   entraAudience: string;
   entraJwksUrl: string;
   entraTokenVersion: "1.0" | "2.0";
+  devAuthMode: "enforce" | "allow";
+  devAuthSharedSecret?: string;
   tenantMode: "single" | "multi" | "both";
   entraTenantId?: string;
   allowedTenantIds: string[];
@@ -101,6 +105,8 @@ export function readRuntimeConfig(): RuntimeConfig {
     entraAudience: parsed.ENTRA_AUDIENCE,
     entraJwksUrl: parsed.ENTRA_JWKS_URL,
     entraTokenVersion: parsed.ENTRA_TOKEN_VERSION,
+    devAuthMode: parsed.DEV_AUTH_MODE,
+    ...(parsed.DEV_AUTH_SHARED_SECRET ? { devAuthSharedSecret: parsed.DEV_AUTH_SHARED_SECRET } : {}),
     tenantMode: parsed.TENANT_MODE,
     ...(parsed.ENTRA_TENANT_ID ? { entraTenantId: parsed.ENTRA_TENANT_ID } : {}),
     allowedTenantIds: splitCsv(parsed.ALLOWED_TENANT_IDS),

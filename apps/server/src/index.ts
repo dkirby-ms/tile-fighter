@@ -102,7 +102,9 @@ async function bootstrap(): Promise<void> {
 
   const app = createHttpApp({
     readinessCheck,
-    authMiddleware: buildAuthMiddleware(authService),
+    authMiddleware: buildAuthMiddleware(authService, undefined, {
+      devAuthMode: runtimeConfig.devAuthMode
+    }),
     telemetrySink,
     authService,
     lifecycleService,
@@ -138,15 +140,15 @@ async function bootstrap(): Promise<void> {
     deltaFanoutConfig
   });
 
-  nodeServer.listen(runtimeConfig.port, () => {
-    process.stdout.write(`Server listening on port ${runtimeConfig.port}\n`);
-  });
+  const maybeListenable = gameServer as unknown as {
+    listen?: (port: number) => Promise<void> | void;
+  };
 
-  registerGracefulShutdown(async () => {
-    lifecycleService.stop();
-    await gameServer.gracefullyShutdown();
+  if (typeof maybeListenable.listen === "function") {
+    await maybeListenable.listen(runtimeConfig.port);
+  } else {
     await new Promise<void>((resolve, reject) => {
-      nodeServer.close((error) => {
+      nodeServer.listen(runtimeConfig.port, (error?: Error) => {
         if (error) {
           reject(error);
           return;
@@ -154,6 +156,13 @@ async function bootstrap(): Promise<void> {
         resolve();
       });
     });
+  }
+
+  process.stdout.write(`Server listening on port ${runtimeConfig.port}\n`);
+
+  registerGracefulShutdown(async () => {
+    lifecycleService.stop();
+    await gameServer.gracefullyShutdown();
     await closeDatabaseRuntime(dbRuntime);
   });
 }

@@ -27,7 +27,6 @@
     "express": "^4.19.2",
     "express-jwt": "^8.4.1",
     "express-session": "^1.19.0",
-    "grant": "^5.4.22",
     "kysely": "^0.28.8",
     "pg": "^8.13.0",
     "zod": "^3.23.8"
