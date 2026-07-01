@@ -46,45 +46,45 @@ Scaffold a minimal Vite-powered browser runtime inside `apps/client` and wire th
 
 ## Implementation Checklist
 
-### [ ] Implementation Phase 1: Browser Runtime Scaffold and Workspace Scripts
+### [x] Implementation Phase 1: Browser Runtime Scaffold and Workspace Scripts
 
 <!-- parallelizable: true -->
 
-* [ ] Step 1.1: Add browser runtime tooling and entry files in `apps/client`
+* [x] Step 1.1: Add browser runtime tooling and entry files in `apps/client`
   * Details: `.copilot-tracking/details/2026-07-01/client-minimal-playable-loop-details.md` (Lines 9-28)
-* [ ] Step 1.2: Add root and client scripts for server/client development workflows
+* [x] Step 1.2: Add root and client scripts for server/client development workflows
   * Details: `.copilot-tracking/details/2026-07-01/client-minimal-playable-loop-details.md` (Lines 30-47)
-* [ ] Step 1.3: Validate scaffold-level build and lint for client workspace
+* [x] Step 1.3: Validate scaffold-level build and lint for client workspace
   * Details: `.copilot-tracking/details/2026-07-01/client-minimal-playable-loop-details.md` (Lines 70-76)
-* [ ] Step 1.4: Verify standalone root browser dev command
+* [x] Step 1.4: Verify standalone root browser dev command
   * Details: `.copilot-tracking/details/2026-07-01/client-minimal-playable-loop-details.md` (Lines 78-90)
 
 ### [ ] Implementation Phase 2: First Playable Loop Integration
 
 <!-- parallelizable: false -->
 
-* [ ] Step 2.0: Establish auth preflight path for local browser bring-up
+* [x] Step 2.0: Establish auth preflight path for local browser bring-up
   * Details: `.copilot-tracking/details/2026-07-01/client-minimal-playable-loop-details.md` (Lines 98-122)
-* [ ] Step 2.1: Implement browser orchestration for bootstrap, join-token, room join, and tile place
+* [x] Step 2.1: Implement browser orchestration for bootstrap, join-token, room join, and tile place
   * Details: `.copilot-tracking/details/2026-07-01/client-minimal-playable-loop-details.md` (Lines 124-149)
-* [ ] Step 2.2: Add minimal render/state module to reflect joined and delta-updated tile state
+* [x] Step 2.2: Add minimal render/state module to reflect joined and delta-updated tile state
   * Details: `.copilot-tracking/details/2026-07-01/client-minimal-playable-loop-details.md` (Lines 151-169)
-* [ ] Step 2.3: Isolate browser-incompatible checksum implementation from browser entry path
+* [x] Step 2.3: Isolate browser-incompatible checksum implementation from browser entry path
   * Details: `.copilot-tracking/details/2026-07-01/client-minimal-playable-loop-details.md` (Lines 171-187)
 * [ ] Step 2.4: Validate playable loop manually with local server and browser runtime
   * Details: `.copilot-tracking/details/2026-07-01/client-minimal-playable-loop-details.md` (Lines 189-207)
 
-### [ ] Implementation Phase 3: Final Validation
+### [x] Implementation Phase 3: Final Validation
 
 <!-- parallelizable: false -->
 
-* [ ] Step 3.1: Run full project validation for impacted workspaces
+* [x] Step 3.1: Run full project validation for impacted workspaces
   * Execute lint for root and `@game/client`.
   * Execute build for root workspaces (or targeted server/client build if root build is too broad).
   * Execute tests covering client session/auth callers and any new browser-targeted unit tests.
-* [ ] Step 3.2: Fix minor validation issues
+* [x] Step 3.2: Fix minor validation issues
   * Iterate on lint/build/test failures caused by this task only.
-* [ ] Step 3.3: Report blocking issues
+* [x] Step 3.3: Report blocking issues
   * Document unresolved auth/local token constraints and any environment prerequisites.
 
 ## Planning Log

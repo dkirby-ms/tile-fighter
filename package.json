@@ -8,7 +8,10 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "npm run -w @game/server dev",
+    "dev:server": "npm run -w @game/server dev",
+    "dev:client": "npm run -w @game/client dev",
+    "dev": "concurrently --kill-others-on-fail \"npm run -w @game/server dev\" \"npm run -w @game/client dev\"",
+    "dev:full": "npm run dev",
     "build": "tsc -b",
     "lint": "npm run --workspaces lint",
     "test": "npm run --workspaces test",
@@ -22,6 +25,7 @@
     "@types/node": "^22.10.2",
     "@typescript-eslint/eslint-plugin": "^8.62.0",
     "@typescript-eslint/parser": "^8.62.0",
+    "concurrently": "^9.2.1",
     "eslint": "^9.39.0",
     "globals": "^15.15.0",
     "typescript": "^5.6.3",

@@ -1,4 +1,3 @@
-import crypto from "node:crypto";
 import type { ReplayDelta } from "./reconnect-caller.js";
 
 export type ReplayTileState = {
@@ -144,7 +143,60 @@ export function computeFullRegionCanonicalChecksum(rows: ReplayTileState[]): str
       ownerId: row.ownerId
     }));
 
-  return crypto.createHash("sha256").update(JSON.stringify(normalized)).digest("hex");
+  const json = JSON.stringify(normalized);
+  return createDeterministicHash(json);
+}
+
+export async function createBrowserChecksum(rows: ReplayTileState[]): Promise<string> {
+  const normalized = [...rows]
+    .sort((left, right) => {
+      if (left.cellX !== right.cellX) {
+        return left.cellX - right.cellX;
+      }
+
+      if (left.cellY !== right.cellY) {
+        return left.cellY - right.cellY;
+      }
+
+      if (left.offsetX !== right.offsetX) {
+        return left.offsetX - right.offsetX;
+      }
+
+      if (left.offsetY !== right.offsetY) {
+        return left.offsetY - right.offsetY;
+      }
+
+      if (left.shape !== right.shape) {
+        return left.shape.localeCompare(right.shape);
+      }
+
+      if (left.color !== right.color) {
+        return left.color.localeCompare(right.color);
+      }
+
+      return left.ownerId.localeCompare(right.ownerId);
+    })
+    .map((row) => ({
+      regionId: row.regionId,
+      cellX: row.cellX,
+      cellY: row.cellY,
+      offsetX: row.offsetX,
+      offsetY: row.offsetY,
+      shape: row.shape,
+      color: row.color,
+      stylePayload: normalizeJsonValue(row.stylePayload),
+      ownerId: row.ownerId
+    }));
+
+  const payload = JSON.stringify(normalized);
+  const subtle = globalThis.crypto?.subtle;
+  if (subtle) {
+    const data = new TextEncoder().encode(payload);
+    const digest = await subtle.digest("SHA-256", data);
+    return bytesToHex(new Uint8Array(digest));
+  }
+
+  return createDeterministicHash(payload);
 }
 
 function isUpsertDelta(delta: ReplayDelta): delta is ReplayDelta & {
@@ -193,4 +245,20 @@ function normalizeJsonValue(value: unknown): JsonLike {
   }
 
   return String(value);
+}
+
+function createDeterministicHash(value: string): string {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+
+  return `fnv1a32-${(hash >>> 0).toString(16).padStart(8, "0")}`;
+}
+
+function bytesToHex(bytes: Uint8Array): string {
+  return Array.from(bytes)
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
 }

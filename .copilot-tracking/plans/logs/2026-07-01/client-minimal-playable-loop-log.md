@@ -11,7 +11,26 @@ Gaps and differences identified between research findings and the implementation
 
 ### Plan Deviations from Research
 
-* None currently identified.
+* DD-01: Root `dev:full` implementation introduced `concurrently` in root devDependencies.
+  * Plan intent: Add root aliases for server/client workflows.
+  * Implementation detail: Added `concurrently` dependency to satisfy command orchestration.
+  * Rationale: Enables explicit `dev:full` without changing existing `dev` command behavior.
+* DD-02: Phase 1 scaffold intentionally uses stubbed API and room connectors.
+  * Plan intent: Create browser runtime scaffold and validate startup.
+  * Implementation detail: `probeApi` and `connectRoom` currently return placeholder state.
+  * Rationale: Defers gameplay/auth orchestration to Phase 2 per plan boundaries.
+* DD-03: Phase 2 added an explicit browser dependency on `@colyseus/sdk` in `@game/client`.
+  * Plan intent: Integrate room join and realtime delta handling.
+  * Implementation detail: Added client runtime dependency instead of indirect import strategy.
+  * Rationale: Required for direct browser room connection in the first playable loop.
+* DD-04: Step 2.4 validated command startup but not full authenticated browser interaction loop.
+  * Plan intent: Validate bootstrap -> join-token -> room join -> place -> render update manually.
+  * Implementation detail: Command-level bring-up verified; interactive loop remains pending.
+  * Rationale: External identity sign-in and local auth environment prerequisites were not fully exercised in automation.
+* DD-05: Phase 3 required two scoped fixes discovered during root validation.
+  * Plan intent: Final validation should pass or surface blockers.
+  * Implementation detail: Updated browser render typing/lint compliance and optional scope guarding in app startup logic.
+  * Rationale: Root lint/build exposed issues introduced by newly added browser loop paths.
 
 ## Implementation Paths Considered
 

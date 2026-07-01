@@ -108,8 +108,11 @@ function withAuthorizationFlag<T extends object>(
 
 export function buildAuthMiddleware(
   authService: AuthService,
-  operatorClaimContract: OperatorClaimContract = DEFAULT_OPERATOR_CLAIM_CONTRACT
+  operatorClaimContract: OperatorClaimContract = DEFAULT_OPERATOR_CLAIM_CONTRACT,
+  options: { devAuthMode?: "enforce" | "allow" } = {}
 ) {
+  const devAuthMode = options.devAuthMode ?? "enforce";
+
   return async function authMiddleware(
     req: Request,
     res: Response,
@@ -123,6 +126,26 @@ export function buildAuthMiddleware(
       res.locals.principal = withAuthorizationFlag(principal, operatorClaimContract);
       next();
     } catch {
+      if (devAuthMode === "allow") {
+        const devSubject = "dev-user";
+        const devTenantId = "dev-tenant";
+        res.locals.principal = withAuthorizationFlag(
+          {
+            subject: devSubject,
+            tenantScopedSubject: `${devTenantId}|${devSubject}`,
+            issuer: "dev-auth-bypass",
+            audience: "api://tile-fighter-server",
+            tenantId: devTenantId,
+            tokenVersion: "2.0",
+            expiresAt: Math.floor(Date.now() / 1000) + 3600,
+            roles: ["Operator"]
+          },
+          operatorClaimContract
+        );
+        next();
+        return;
+      }
+
       res.status(401).json({ error: "Unauthorized" });
     }
   };

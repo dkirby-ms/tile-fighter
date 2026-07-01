@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   applyReplayAndValidateChecksum,
+  createBrowserChecksum,
   computeFullRegionCanonicalChecksum,
   ReplayChecksumError,
   type ReplayTileState
@@ -108,7 +109,7 @@ describe("replay-checksum", () => {
     });
 
     expect(result.match).toBe(false);
-    expect(result.clientChecksum).not.toBe("deadbeef");
+    expect(result.clientChecksum).toMatch(/^fnv1a32-[0-9a-f]{8}$/);
   });
 
   it("throws on invalid upsert payload", () => {
@@ -169,5 +170,36 @@ describe("replay-checksum", () => {
     expect(computeFullRegionCanonicalChecksum(rowsA)).toBe(
       computeFullRegionCanonicalChecksum(rowsB)
     );
+  });
+
+  it("creates browser checksum deterministically without node:crypto", async () => {
+    const rowsA: ReplayTileState[] = [
+      {
+        regionId: REGION_ID,
+        cellX: 3,
+        cellY: 1,
+        offsetX: 0,
+        offsetY: 0,
+        shape: "square",
+        color: "orange",
+        stylePayload: { z: 2, a: 1 },
+        ownerId: "p7"
+      },
+      {
+        regionId: REGION_ID,
+        cellX: 1,
+        cellY: 2,
+        offsetX: 0,
+        offsetY: 0,
+        shape: "triangle",
+        color: "blue",
+        stylePayload: { a: 1, z: 2 },
+        ownerId: "p8"
+      }
+    ];
+
+    const rowsB = [rowsA[1], rowsA[0]];
+
+    await expect(createBrowserChecksum(rowsA)).resolves.toBe(await createBrowserChecksum(rowsB));
   });
 });
