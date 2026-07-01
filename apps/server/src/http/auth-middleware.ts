@@ -58,8 +58,6 @@ function resolveOperatorAuthorization(
       // Audit logging: operator authorization via roles
       // Can be used to track operator action patterns across identity systems
       console.debug("[AuthMiddleware] Operator auth resolved via roles");
-    } else {
-      console.debug("[AuthMiddleware] Operator auth NOT resolved via roles");
     }
     return isOperator;
   }
@@ -69,8 +67,6 @@ function resolveOperatorAuthorization(
     if (isOperator) {
       // Audit logging: operator authorization via scopes
       console.debug("[AuthMiddleware] Operator auth resolved via scopes");
-    } else {
-      console.debug("[AuthMiddleware] Operator auth NOT resolved via scopes");
     }
     return isOperator;
   }
@@ -88,8 +84,6 @@ function resolveOperatorAuthorization(
     console.debug("[AuthMiddleware] Operator auth resolved via scopes (fallback)");
     return true;
   }
-
-  console.debug("[AuthMiddleware] Operator auth NOT resolved (no matching roles, no matching scopes)");
   return false;
 }
 
@@ -112,6 +106,7 @@ export function buildAuthMiddleware(
   options: { devAuthMode?: "enforce" | "allow" } = {}
 ) {
   const devAuthMode = options.devAuthMode ?? "enforce";
+  const shouldLogAuthFailures = process.env.NODE_ENV !== "production";
 
   return async function authMiddleware(
     req: Request,
@@ -125,7 +120,7 @@ export function buildAuthMiddleware(
       const principal = await authService.verifyAccessToken(token);
       res.locals.principal = withAuthorizationFlag(principal, operatorClaimContract);
       next();
-    } catch {
+    } catch (error) {
       if (devAuthMode === "allow") {
         const devSubject = "dev-user";
         const devTenantId = "dev-tenant";
@@ -144,6 +139,11 @@ export function buildAuthMiddleware(
         );
         next();
         return;
+      }
+
+      if (shouldLogAuthFailures) {
+        const message = error instanceof Error ? error.message : "Unknown auth validation error";
+        console.warn(`[AuthMiddleware] Rejecting bearer token: ${message}`);
       }
 
       res.status(401).json({ error: "Unauthorized" });
