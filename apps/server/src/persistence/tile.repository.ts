@@ -739,6 +739,7 @@ export class TileRepository implements ITileRepository {
         .where("cell_y", "=", input.cellY)
         .where("owner_id", "=", input.ownerId)
         .where("created_at", ">=", windowStart)
+        .where("created_at", "<=", input.now)
         .returning(["id"])
         .executeTakeFirst();
 

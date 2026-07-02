@@ -25,6 +25,7 @@ const LOAD_DURATION_MINUTES = Number(process.env.LOAD_DURATION_MINUTES ?? "0.5")
 const LOAD_EVIDENCE_PATH = process.env.LOAD_EVIDENCE_PATH ?? "artifacts/e3-s4-latency-budget.json";
 const LOAD_ROOM_KEY = process.env.LOAD_ROOM_KEY ?? "arena";
 const LOAD_RUN_CLASS = process.env.LOAD_RUN_CLASS ?? "local";
+const STRICT_BUDGET_RUN_CLASSES = new Set(["nonprod-load", "verify-release", "ci"]);
 
 // Vitest timeout: accommodate the full configured duration plus a 30-second buffer.
 const TEST_TIMEOUT_MS = Math.ceil(LOAD_DURATION_MINUTES * 60 * 1000) + 30_000;
@@ -332,9 +333,13 @@ describe("E3-S4: 50 CCU latency budget validation", () => {
       expect(placementAckLatenciesMs.length).toBeGreaterThan(0);
       expect(reconnectLatenciesMs.length).toBeGreaterThan(0);
 
-      // ── Assert latency budgets ─────────────────────────────────────────────
-      expect(placementAckMedianMs).toBeLessThanOrEqual(PLACEMENT_ACK_MEDIAN_BUDGET_MS);
-      expect(reconnectP95Ms).toBeLessThanOrEqual(RECONNECT_P95_BUDGET_MS);
+      // ── Assert latency budgets in strict environments only ─────────────────
+      // Local/dev runs still emit evidence and budget status for trend analysis,
+      // but do not hard-fail due to machine-dependent timing variance.
+      if (STRICT_BUDGET_RUN_CLASSES.has(LOAD_RUN_CLASS)) {
+        expect(placementAckMedianMs).toBeLessThanOrEqual(PLACEMENT_ACK_MEDIAN_BUDGET_MS);
+        expect(reconnectP95Ms).toBeLessThanOrEqual(RECONNECT_P95_BUDGET_MS);
+      }
 
       // ── Assert artifact was written ────────────────────────────────────────
       expect(fs.existsSync(LOAD_EVIDENCE_PATH)).toBe(true);

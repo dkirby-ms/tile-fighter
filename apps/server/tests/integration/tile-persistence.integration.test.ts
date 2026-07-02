@@ -9,6 +9,7 @@ import { SessionLifecycleService } from "../../src/session/session-lifecycle.ser
 import { TelemetrySink } from "../../src/telemetry/telemetry-sink.js";
 import { createIntegrationTestDbGuard } from "./test-db-guard.js";
 import { vi } from "vitest";
+import { buildValidCommandId } from "./test-fixtures.js";
 
 describe("Tile persistence integration", () => {
   let runtime: DatabaseRuntime | null = null;
@@ -269,7 +270,7 @@ describe("Tile persistence integration", () => {
     expect(tiles.map((t) => t.cell_y).sort()).toEqual([0, 0, 1]);
   });
 
-  it.skipIf(!testsCanRun || !db)("should isolate tiles between regions", async () => {
+  it.skipIf(!testsCanRun)("should isolate tiles between regions", async () => {
 
     const region1 = "region-a";
     const region2 = "region-b";
@@ -314,7 +315,7 @@ describe("Tile persistence integration", () => {
     expect(tilesRegion2[0].region_id).toBe(region2);
   });
 
-  it.skipIf(!testsCanRun || !db)("should find tile by specific coordinate", async () => {
+  it.skipIf(!testsCanRun)("should find tile by specific coordinate", async () => {
 
     const region = "test-region-4";
 
@@ -353,7 +354,7 @@ describe("Tile persistence integration", () => {
     expect(found?.owner_id).toBe("owner-2");
   });
 
-  it.skipIf(!testsCanRun || !db)("should return null when coordinate not found", async () => {
+  it.skipIf(!testsCanRun)("should return null when coordinate not found", async () => {
 
     const region = "test-region-5";
 
@@ -376,7 +377,7 @@ describe("Tile persistence integration", () => {
     expect(found).toBeNull();
   });
 
-  it.skipIf(!testsCanRun || !db)("should enforce offset constraints at database level", async () => {
+  it.skipIf(!testsCanRun)("should enforce offset constraints at database level", async () => {
 
     // Valid offset values should succeed
     const validTile = await repository.insertTile(db, {
@@ -397,7 +398,7 @@ describe("Tile persistence integration", () => {
     // doesn't validate them - the database constraint handles validation
   });
 
-  it.skipIf(!testsCanRun || !db)("should allow owner edit when within 10-minute self-edit window", async () => {
+  it.skipIf(!testsCanRun)("should allow owner edit when within 10-minute self-edit window", async () => {
     const regionId = "test-edit-window-allow";
 
     const inserted = await repository.insertTile(db, {
@@ -439,7 +440,7 @@ describe("Tile persistence integration", () => {
     expect(updated?.owner_id).toBe("owner-allow");
   });
 
-  it.skipIf(!testsCanRun || !db)("should reject edit for non-owner with forbidden_owner_mismatch", async () => {
+  it.skipIf(!testsCanRun)("should reject edit for non-owner with forbidden_owner_mismatch", async () => {
     const regionId = "test-edit-owner-mismatch";
 
     const inserted = await repository.insertTile(db, {
@@ -482,7 +483,7 @@ describe("Tile persistence integration", () => {
     expect(unchanged?.owner_id).toBe("owner-original");
   });
 
-  it.skipIf(!testsCanRun || !db)("should reject owner edit after self-edit window expires", async () => {
+  it.skipIf(!testsCanRun)("should reject owner edit after self-edit window expires", async () => {
     const regionId = "test-edit-expired";
 
     const inserted = await repository.insertTile(db, {
@@ -524,7 +525,7 @@ describe("Tile persistence integration", () => {
     expect(unchanged?.color).toBe("red");
   });
 
-  it.skipIf(!testsCanRun || !db)("should reject edit when server clock skews backward (edge case)", async () => {
+  it.skipIf(!testsCanRun)("should reject edit when server clock skews backward (edge case)", async () => {
     const regionId = "test-clock-skew";
 
     const inserted = await repository.insertTile(db, {
@@ -571,7 +572,7 @@ describe("Tile persistence integration", () => {
     expect(unchanged?.color).toBe("blue");
   });
 
-  it.skipIf(!testsCanRun || !db)("should enforce placement throttle and recover after window", async () => {
+  it.skipIf(!testsCanRun)("should enforce placement throttle and recover after window", async () => {
     const { app, telemetrySink } = createAppWithThrottle(2, 120);
 
     const makePlacement = (cellX: number) =>
@@ -579,6 +580,7 @@ describe("Tile persistence integration", () => {
         .post("/api/tiles/place")
         .set("Authorization", "Bearer valid-token")
         .send({
+          commandId: buildValidCommandId(`throttle-${cellX}`),
           regionId: "throttle-region-a",
           cellX,
           cellY: 0,
