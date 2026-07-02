@@ -28,6 +28,8 @@ First we will brainstorm and build our idea into a design document. We can works
 1. Merged epic 2 after PR review pass and fixes and some minor fixes to CI (db was missing from GH runner workflow).
 1. Began research, planning, imp on E3.
 1. Noticed Release workflows not configured for GH OIDC (expected Azure SPN and secret). Deployed RPI agent to fix.
+1. After review of progress, decided E4+E5 need to have major UAT gates, including playable browser client. RPI'd E4/E5 with this context after some trial and error. Made enough progress to get playable tile placement client working and iterating through basic E4/E5 tile placement logic.
+1. Added Colyseus monitor route on server for debugging.
 
 ### CI/CD Harness
 

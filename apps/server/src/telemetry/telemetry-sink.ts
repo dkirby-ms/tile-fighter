@@ -410,6 +410,92 @@ export class TelemetrySink {
   }
 
   /**
+   * Emit bonding_triggered when an authoritative bond outcome is computed.
+   */
+  async emitBondingTriggered(input: {
+    regionId: string;
+    bondId: string;
+    bondType: string;
+    fromCellX: number;
+    fromCellY: number;
+    toCellX: number;
+    toCellY: number;
+    color: string;
+  }): Promise<void> {
+    await this.emit("bonding_triggered", {
+      region_id: input.regionId,
+      bond_id: input.bondId,
+      bond_type: input.bondType,
+      from_cell_x: input.fromCellX,
+      from_cell_y: input.fromCellY,
+      to_cell_x: input.toCellX,
+      to_cell_y: input.toCellY,
+      color: input.color,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  /**
+   * Emit bond_recalc_started when neighborhood recompute begins.
+   */
+  async emitBondRecalcStarted(input: {
+    regionId: string;
+    originCellX: number;
+    originCellY: number;
+    touchedCellCount: number;
+  }): Promise<void> {
+    await this.emit("bond_recalc_started", {
+      region_id: input.regionId,
+      origin_cell_x: input.originCellX,
+      origin_cell_y: input.originCellY,
+      touched_cell_count: input.touchedCellCount,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  /**
+   * Emit bond_recalc_completed when neighborhood recompute completes with bond results.
+   */
+  async emitBondRecalcCompleted(input: {
+    regionId: string;
+    originCellX: number;
+    originCellY: number;
+    touchedCellCount: number;
+    recalculatedCellCount: number;
+    skippedCellCount: number;
+    bondCount: number;
+  }): Promise<void> {
+    await this.emit("bond_recalc_completed", {
+      region_id: input.regionId,
+      origin_cell_x: input.originCellX,
+      origin_cell_y: input.originCellY,
+      touched_cell_count: input.touchedCellCount,
+      recalculated_cell_count: input.recalculatedCellCount,
+      skipped_cell_count: input.skippedCellCount,
+      bond_count: input.bondCount,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  /**
+   * Emit bond_recalc_skipped for touched coordinates that had no tile to recompute.
+   */
+  async emitBondRecalcSkipped(input: {
+    regionId: string;
+    originCellX: number;
+    originCellY: number;
+    skippedCellCount: number;
+  }): Promise<void> {
+    await this.emit("bond_recalc_skipped", {
+      region_id: input.regionId,
+      origin_cell_x: input.originCellX,
+      origin_cell_y: input.originCellY,
+      skipped_cell_count: input.skippedCellCount,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  /**
    * Emit load_run_started when a sustained load scenario begins.
    */
   async emitLoadRunStarted(input: {

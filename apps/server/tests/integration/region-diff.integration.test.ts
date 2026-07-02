@@ -15,6 +15,7 @@ import { createTileRepository } from "../../src/persistence/tile.repository.js";
 import { createRegionDiffRepository } from "../../src/persistence/region-diff.repository.js";
 import { createRegionDiffService } from "../../src/domain/region-diff.service.js";
 import { createIntegrationTestDbGuard } from "./test-db-guard.js";
+import { makeRegionDiffRequest, REGION_DIFF_TEST_LIMITS } from "./test-fixtures.js";
 
 describe("Region diff integration", () => {
   const dbGuard = createIntegrationTestDbGuard("region-diff.integration");
@@ -56,6 +57,7 @@ describe("Region diff integration", () => {
       return;
     }
 
+    await db.deleteFrom("placement_commands").execute();
     await db.deleteFrom("tile_deltas").execute();
     await db.deleteFrom("region_versions").execute();
     await db.deleteFrom("tiles").execute();
@@ -69,8 +71,8 @@ describe("Region diff integration", () => {
     } as unknown as TelemetrySink;
 
     const authService = {
-      verifyAccessToken: vi.fn(async () => {
-        if (!authEnabled) {
+      verifyAccessToken: vi.fn(async (token: string) => {
+        if (!authEnabled || token.trim().length === 0) {
           throw new Error("unauthorized");
         }
 
@@ -121,9 +123,9 @@ describe("Region diff integration", () => {
       tileRepository,
       regionDiffService,
       regionDiffLimits: {
-        defaultMaxTiles: 2,
-        maxTilesPerRequest: 3,
-        maxViewportArea: 25
+        defaultMaxTiles: REGION_DIFF_TEST_LIMITS.defaultMaxTiles,
+        maxTilesPerRequest: REGION_DIFF_TEST_LIMITS.maxTilesPerRequest,
+        maxViewportArea: REGION_DIFF_TEST_LIMITS.maxViewportArea
       }
     });
   }
@@ -159,12 +161,11 @@ describe("Region diff integration", () => {
     }
   }
 
-  it.skipIf(!testsCanRun || !db)("returns 401 when Authorization header is missing", async () => {
+  it.skipIf(!testsCanRun)("returns 401 when Authorization header is missing", async () => {
     const app = createApp();
 
     const response = await request(app).post("/api/regions/diff").send({
-      regionId: "region-diff-a",
-      sinceVersion: 0,
+      ...makeRegionDiffRequest(),
       viewport: {
         minCellX: 0,
         maxCellX: 10,
@@ -176,70 +177,70 @@ describe("Region diff integration", () => {
     expect(response.status).toBe(401);
   });
 
-  it.skipIf(!testsCanRun || !db)("returns 403 for authenticated non-member", async () => {
+  it.skipIf(!testsCanRun)("returns 403 for authenticated non-member", async () => {
     const app = createApp(true, "tenant-a|player-2");
 
     const response = await request(app)
       .post("/api/regions/diff")
       .set("Authorization", "Bearer valid-token")
-      .send({
-        regionId: "region-diff-a",
-        sinceVersion: 0,
-        viewport: {
-          minCellX: 0,
-          maxCellX: 4,
-          minCellY: 0,
-          maxCellY: 4
-        }
-      });
+      .send(
+        makeRegionDiffRequest({
+          regionId: "region-diff-a",
+          sinceVersion: 0
+        })
+      );
 
     expect(response.status).toBe(403);
     expect(response.body).toEqual({ error: "Forbidden" });
   });
 
-  it.skipIf(!testsCanRun || !db)("returns 400 for malformed payload", async () => {
+  it.skipIf(!testsCanRun)("returns 400 for malformed payload", async () => {
     const app = createApp();
 
     const response = await request(app)
       .post("/api/regions/diff")
       .set("Authorization", "Bearer valid-token")
-      .send({
-        regionId: "region-diff-a",
-        sinceVersion: -1,
-        viewport: {
-          minCellX: 5,
-          maxCellX: 1,
-          minCellY: 0,
-          maxCellY: 10
-        }
-      });
+      .send(
+        makeRegionDiffRequest({
+          regionId: "region-diff-a",
+          sinceVersion: -1,
+          viewport: {
+            minCellX: 5,
+            maxCellX: 1,
+            minCellY: 0,
+            maxCellY: 10
+          }
+        })
+      );
 
     expect(response.status).toBe(400);
     expect(response.body).toEqual({ error: "Invalid region diff request" });
   });
 
-  it.skipIf(!testsCanRun || !db)("returns 400 for negative viewport coordinates", async () => {
+  it.skipIf(!testsCanRun)("returns 400 for negative viewport coordinates", async () => {
     const app = createApp();
 
     const response = await request(app)
       .post("/api/regions/diff")
       .set("Authorization", "Bearer valid-token")
-      .send({
-        regionId: "region-diff-a",
-        sinceVersion: 0,
-        viewport: {
-          minCellX: -5,
-          maxCellX: 4,
-          minCellY: 0,
-          maxCellY: 4
-        }
-      });
+      .send(
+        makeRegionDiffRequest({
+          regionId: "region-diff-a",
+          sinceVersion: 0,
+          viewport: {
+            minCellX: -5,
+            maxCellX: 4,
+            minCellY: 0,
+            maxCellY: 4
+          }
+        })
+      );
 
     expect(response.status).toBe(400);
     expect(response.body).toEqual({ error: "Invalid region diff request" });
   });
 
-  it.skipIf(!testsCanRun || !db)("returns empty diff when client is unchanged", async () => {
+  it.skipIf(!testsCanRun)("returns empty diff when client is unchanged", async () => {
     const app = createApp();
 
     await placeTile({ cellX: 1, cellY: 1, color: "red" });
@@ -248,16 +249,12 @@ describe("Region diff integration", () => {
     const response = await request(app)
       .post("/api/regions/diff")
       .set("Authorization", "Bearer valid-token")
-      .send({
-        regionId: "region-diff-a",
-        sinceVersion: 2,
-        viewport: {
-          minCellX: 0,
-          maxCellX: 10,
-          minCellY: 0,
-          maxCellY: 10
-        }
-      });
+      .send(
+        makeRegionDiffRequest({
+          regionId: "region-diff-a",
+          sinceVersion: 2
+        })
+      );
 
     expect(response.status).toBe(200);
     expect(response.body.ok).toBe(true);
@@ -268,7 +265,7 @@ describe("Region diff integration", () => {
     expect(response.body.truncated).toBe(false);
   });
 
-  it.skipIf(!testsCanRun || !db)("returns stale latest-wins compacted diff and truncates by maxTiles", async () => {
+  it.skipIf(!testsCanRun)("returns stale latest-wins compacted diff and truncates by maxTiles", async () => {
     const app = createApp();
 
     await placeTile({ cellX: 1, cellY: 1, color: "red" });
@@ -290,17 +287,13 @@ describe("Region diff integration", () => {
     const response = await request(app)
       .post("/api/regions/diff")
       .set("Authorization", "Bearer valid-token")
-      .send({
-        regionId: "region-diff-a",
-        sinceVersion: 0,
-        viewport: {
-          minCellX: 5,
-          maxCellX: 9,
-          minCellY: 5,
-          maxCellY: 9
-        },
-        maxTiles: 2
-      });
+      .send(
+        makeRegionDiffRequest({
+          regionId: "region-diff-a",
+          sinceVersion: 0,
+          maxTiles: 2
+        })
+      );
 
     expect(response.status).toBe(200);
     expect(response.body.ok).toBe(true);
@@ -346,7 +339,7 @@ describe("Region diff integration", () => {
     });
   });
 
-  it.skipIf(!testsCanRun || !db)("returns 400 when viewport area exceeds configured max", async () => {
+  it.skipIf(!testsCanRun)("returns 400 when viewport area exceeds configured max", async () => {
     const app = createApp();
 
     const response = await request(app)
@@ -367,7 +360,7 @@ describe("Region diff integration", () => {
     expect(response.body).toEqual({ error: "Invalid region diff request" });
   });
 
-  it.skipIf(!testsCanRun || !db)("returns 400 when maxTiles exceeds configured cap", async () => {
+  it.skipIf(!testsCanRun)("returns 400 when maxTiles exceeds configured cap", async () => {
     const app = createApp();
 
     const response = await request(app)
@@ -389,7 +382,7 @@ describe("Region diff integration", () => {
     expect(response.body).toEqual({ error: "Invalid region diff request" });
   });
 
-  it.skipIf(!testsCanRun || !db)("filters out delete operations from diff result (latest-wins, deletes implicit)", async () => {
+  it.skipIf(!testsCanRun)("filters out delete operations from diff result (latest-wins, deletes implicit)", async () => {
     const app = createApp();
 
     await placeTile({ cellX: 6, cellY: 6, color: "red" });
@@ -417,7 +410,7 @@ describe("Region diff integration", () => {
     expect(response.body.isEmpty).toBe(true);
   });
 
-  it.skipIf(!testsCanRun || !db)("includes live tiles and excludes deleted tiles in same diff", async () => {
+  it.skipIf(!testsCanRun)("includes live tiles and excludes deleted tiles in same diff", async () => {
     const app = createApp();
 
     // Place two tiles
@@ -435,11 +428,11 @@ describe("Region diff integration", () => {
         sinceVersion: 0,
         viewport: {
           minCellX: 0,
-          maxCellX: 10,
+          maxCellX: 4,
           minCellY: 0,
-          maxCellY: 10
+          maxCellY: 4
         },
-        maxTiles: 100
+        maxTiles: 3
       });
 
     expect(response.status).toBe(200);

@@ -9,6 +9,7 @@ import { SessionLifecycleService } from "../../src/session/session-lifecycle.ser
 import { TelemetrySink } from "../../src/telemetry/telemetry-sink.js";
 import { createIntegrationTestDbGuard } from "./test-db-guard.js";
 import { vi } from "vitest";
+import { buildValidCommandId } from "./test-fixtures.js";
 
 describe("Tile persistence integration", () => {
   let runtime: DatabaseRuntime | null = null;
@@ -110,15 +111,28 @@ describe("Tile persistence integration", () => {
     if (!testsCanRun || !db) {
       return; // Skip setup
     }
-    // Clear tiles table before each test
+
     try {
+      await db.deleteFrom("placement_commands").execute();
+      await db.deleteFrom("tile_deltas").execute();
+      await db.deleteFrom("region_versions").execute();
       await db.deleteFrom("tiles").execute();
     } catch {
       // Ignore errors
     }
   });
 
-  it.skipIf(!testsCanRun || !db)("should persist tile and retrieve by region", async () => {
+  function requireDb(): Kysely<ServerDatabase> {
+    if (!db) {
+      throw new Error("Integration test database was not initialized");
+    }
+
+    return db;
+  }
+
+  it.skipIf(!testsCanRun)("should persist tile and retrieve by region", async () => {
+
+    const testDb = requireDb();
 
     const input = {
       regionId: "test-region-1",
@@ -133,7 +147,7 @@ describe("Tile persistence integration", () => {
     };
 
     // Insert tile
-    const insertResult = await repository.insertTile(db, input);
+    const insertResult = await repository.insertTile(testDb, input);
 
     expect(insertResult.ok).toBe(true);
     if (!insertResult.ok) throw new Error("Insert failed");
@@ -141,7 +155,7 @@ describe("Tile persistence integration", () => {
     const tileId = insertResult.tile.id;
 
     // Query by region
-    const tiles = await repository.selectTilesByRegion(db, "test-region-1");
+    const tiles = await repository.selectTilesByRegion(testDb, "test-region-1");
 
     expect(tiles).toHaveLength(1);
     expect(tiles[0].id).toBe(tileId);
@@ -155,7 +169,9 @@ describe("Tile persistence integration", () => {
     expect(tiles[0].owner_id).toBe("test-owner-1");
   });
 
-  it.skipIf(!testsCanRun || !db)("should return coordinate_conflict on duplicate coordinate insert", async () => {
+  it.skipIf(!testsCanRun)("should return coordinate_conflict on duplicate coordinate insert", async () => {
+    const testDb = requireDb();
+
     const input1 = {
       regionId: "test-region-2",
       cellX: 5,
@@ -181,11 +197,11 @@ describe("Tile persistence integration", () => {
     };
 
     // Insert first tile
-    const result1 = await repository.insertTile(db, input1);
+    const result1 = await repository.insertTile(testDb, input1);
     expect(result1.ok).toBe(true);
 
     // Try to insert second tile at same coordinate
-    const result2 = await repository.insertTile(db, input2);
+    const result2 = await repository.insertTile(testDb, input2);
 
     expect(result2.ok).toBe(false);
     if (result2.ok) throw new Error("Expected conflict");
@@ -195,12 +211,14 @@ describe("Tile persistence integration", () => {
     expect(result2.error.cell_y).toBe(10);
   });
 
-  it.skipIf(!testsCanRun || !db)("should support multiple tiles in same region with different coordinates", async () => {
+  it.skipIf(!testsCanRun)("should support multiple tiles in same region with different coordinates", async () => {
+
+    const testDb = requireDb();
 
     const region = "test-region-3";
 
     // Insert first tile
-    const tile1 = await repository.insertTile(db, {
+    const tile1 = await repository.insertTile(testDb, {
       regionId: region,
       cellX: 0,
       cellY: 0,
@@ -215,7 +233,7 @@ describe("Tile persistence integration", () => {
     expect(tile1.ok).toBe(true);
 
     // Insert second tile at different coordinate
-    const tile2 = await repository.insertTile(db, {
+    const tile2 = await repository.insertTile(testDb, {
       regionId: region,
       cellX: 1,
       cellY: 0,
@@ -230,7 +248,7 @@ describe("Tile persistence integration", () => {
     expect(tile2.ok).toBe(true);
 
     // Insert third tile at different coordinate
-    const tile3 = await repository.insertTile(db, {
+    const tile3 = await repository.insertTile(testDb, {
       regionId: region,
       cellX: 0,
       cellY: 1,
@@ -249,10 +267,10 @@ describe("Tile persistence integration", () => {
 
     expect(tiles).toHaveLength(3);
     expect(tiles.map((t) => t.cell_x).sort()).toEqual([0, 0, 1]);
-    expect(tiles.map((t) => t.cell_y).sort()).toEqual([0, 1, 0]);
+    expect(tiles.map((t) => t.cell_y).sort()).toEqual([0, 0, 1]);
   });
 
-  it.skipIf(!testsCanRun || !db)("should isolate tiles between regions", async () => {
+  it.skipIf(!testsCanRun)("should isolate tiles between regions", async () => {
 
     const region1 = "region-a";
     const region2 = "region-b";
@@ -297,7 +315,7 @@ describe("Tile persistence integration", () => {
     expect(tilesRegion2[0].region_id).toBe(region2);
   });
 
-  it.skipIf(!testsCanRun || !db)("should find tile by specific coordinate", async () => {
+  it.skipIf(!testsCanRun)("should find tile by specific coordinate", async () => {
 
     const region = "test-region-4";
 
@@ -336,7 +354,7 @@ describe("Tile persistence integration", () => {
     expect(found?.owner_id).toBe("owner-2");
   });
 
-  it.skipIf(!testsCanRun || !db)("should return null when coordinate not found", async () => {
+  it.skipIf(!testsCanRun)("should return null when coordinate not found", async () => {
 
     const region = "test-region-5";
 
@@ -359,7 +377,7 @@ describe("Tile persistence integration", () => {
     expect(found).toBeNull();
   });
 
-  it.skipIf(!testsCanRun || !db)("should enforce offset constraints at database level", async () => {
+  it.skipIf(!testsCanRun)("should enforce offset constraints at database level", async () => {
 
     // Valid offset values should succeed
     const validTile = await repository.insertTile(db, {
@@ -380,7 +398,7 @@ describe("Tile persistence integration", () => {
     // doesn't validate them - the database constraint handles validation
   });
 
-  it.skipIf(!testsCanRun || !db)("should allow owner edit when within 10-minute self-edit window", async () => {
+  it.skipIf(!testsCanRun)("should allow owner edit when within 10-minute self-edit window", async () => {
     const regionId = "test-edit-window-allow";
 
     const inserted = await repository.insertTile(db, {
@@ -422,7 +440,7 @@ describe("Tile persistence integration", () => {
     expect(updated?.owner_id).toBe("owner-allow");
   });
 
-  it.skipIf(!testsCanRun || !db)("should reject edit for non-owner with forbidden_owner_mismatch", async () => {
+  it.skipIf(!testsCanRun)("should reject edit for non-owner with forbidden_owner_mismatch", async () => {
     const regionId = "test-edit-owner-mismatch";
 
     const inserted = await repository.insertTile(db, {
@@ -465,7 +483,7 @@ describe("Tile persistence integration", () => {
     expect(unchanged?.owner_id).toBe("owner-original");
   });
 
-  it.skipIf(!testsCanRun || !db)("should reject owner edit after self-edit window expires", async () => {
+  it.skipIf(!testsCanRun)("should reject owner edit after self-edit window expires", async () => {
     const regionId = "test-edit-expired";
 
     const inserted = await repository.insertTile(db, {
@@ -507,7 +525,7 @@ describe("Tile persistence integration", () => {
     expect(unchanged?.color).toBe("red");
   });
 
-  it.skipIf(!testsCanRun || !db)("should reject edit when server clock skews backward (edge case)", async () => {
+  it.skipIf(!testsCanRun)("should reject edit when server clock skews backward (edge case)", async () => {
     const regionId = "test-clock-skew";
 
     const inserted = await repository.insertTile(db, {
@@ -554,7 +572,7 @@ describe("Tile persistence integration", () => {
     expect(unchanged?.color).toBe("blue");
   });
 
-  it.skipIf(!testsCanRun || !db)("should enforce placement throttle and recover after window", async () => {
+  it.skipIf(!testsCanRun)("should enforce placement throttle and recover after window", async () => {
     const { app, telemetrySink } = createAppWithThrottle(2, 120);
 
     const makePlacement = (cellX: number) =>
@@ -562,6 +580,7 @@ describe("Tile persistence integration", () => {
         .post("/api/tiles/place")
         .set("Authorization", "Bearer valid-token")
         .send({
+          commandId: buildValidCommandId(`throttle-${cellX}`),
           regionId: "throttle-region-a",
           cellX,
           cellY: 0,

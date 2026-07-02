@@ -36,3 +36,9 @@ export type {
 	DeltaAckPayload,
 	ApplyDeltaCallback
 } from "./session/realtime-delta-handler.js";
+export {
+	createInitialBrowserAppState,
+	applyRealtimeDelta,
+	recomputeBonds,
+	computeViewportTileBounds
+} from "./browser/state.js";

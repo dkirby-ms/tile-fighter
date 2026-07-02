@@ -34,12 +34,12 @@ describe("Startup migration smoke test", () => {
     }
   });
 
-  it.skipIf(!testsCanRun || !runtime)("should have tiles table available after migrations", async () => {
+  it.skipIf(!testsCanRun)("should have tiles table available after migrations", async () => {
     const result = await runtime!.db.selectFrom("tiles").selectAll().limit(0).execute();
     expect(Array.isArray(result)).toBe(true);
   });
 
-  it.skipIf(!testsCanRun || !runtime)("should create tiles table with correct schema", async () => {
+  it.skipIf(!testsCanRun)("should create tiles table with correct schema", async () => {
     // Query table information
     const tableInfo = await sql`
       SELECT column_name, data_type, is_nullable, column_default
@@ -88,7 +88,7 @@ describe("Startup migration smoke test", () => {
       expect(offsetXCol?.is_nullable).toBe("NO");
   });
 
-  it.skipIf(!testsCanRun || !runtime)("should have unique constraint on region_coordinate", async () => {
+  it.skipIf(!testsCanRun)("should have unique constraint on region_coordinate", async () => {
     // Query constraint information
     const constraintInfo = await sql`
       SELECT constraint_name, constraint_type
@@ -105,7 +105,7 @@ describe("Startup migration smoke test", () => {
       expect(uniqueConstraints.some((name) => name.includes("region_coordinate") || name.includes("tiles"))).toBe(true);
   });
 
-  it.skipIf(!testsCanRun || !runtime)("should have check constraints for offset ranges", async () => {
+  it.skipIf(!testsCanRun)("should have check constraints for offset ranges", async () => {
     // Query check constraints
     const checkInfo = await sql`
       SELECT constraint_name, check_clause
@@ -126,7 +126,7 @@ describe("Startup migration smoke test", () => {
       expect(checkClauses.some((clause) => clause.includes("offset_y"))).toBe(true);
   });
 
-  it.skipIf(!testsCanRun || !runtime)("should have indexes for efficient lookups", async () => {
+  it.skipIf(!testsCanRun)("should have indexes for efficient lookups", async () => {
     // Query indexes
     const indexInfo = await sql`
       SELECT indexname, indexdef
@@ -155,14 +155,14 @@ describe("Startup migration smoke test", () => {
       expect(hasCoordinateIndex).toBe(true);
   });
 
-  it.skipIf(!testsCanRun || !runtime)("should allow server to query tiles table after migration", async () => {
+  it.skipIf(!testsCanRun)("should allow server to query tiles table after migration", async () => {
     // Try a simple query on tiles table
     const result = await runtime!.db.selectFrom("tiles").selectAll().limit(1).execute();
 
     expect(Array.isArray(result)).toBe(true);
   });
 
-  it.skipIf(!testsCanRun || !runtime)("should have match_events table from init migration", async () => {
+  it.skipIf(!testsCanRun)("should have match_events table from init migration", async () => {
     // Verify match_events table exists (from init migration)
     const tableInfo = await sql`
       SELECT table_name
@@ -173,7 +173,7 @@ describe("Startup migration smoke test", () => {
     expect(tableInfo.rows.length).toBeGreaterThan(0);
   });
 
-  it.skipIf(!testsCanRun || !runtime)("should track migrations in pgmigrations table", async () => {
+  it.skipIf(!testsCanRun)("should track migrations in pgmigrations table", async () => {
     // Verify pgmigrations table exists
     const tableInfo = await sql`
       SELECT table_name
@@ -188,7 +188,7 @@ describe("Startup migration smoke test", () => {
     expect(migrations.rows.length).toBeGreaterThan(0);
   });
 
-  it.skipIf(!testsCanRun || !runtime)("should have region snapshot tables from snapshot migration", async () => {
+  it.skipIf(!testsCanRun)("should have region snapshot tables from snapshot migration", async () => {
     const tableInfo = await sql`
       SELECT table_name
       FROM information_schema.tables
